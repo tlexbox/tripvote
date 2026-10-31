@@ -360,6 +360,30 @@ input:focus { border-color: var(--accent); }
   font-size: .75rem; overflow-x: auto; margin-top: 8px; line-height: 1.5;
 }
 
+/* ── Mobile responsive ── */
+@media (max-width: 480px) {
+  body { padding-block: 16px 32px; }
+  #view-trip { max-width: 100%; }
+  .trip-top { gap: 8px; }
+  .trip-name-big { font-size: 1.2rem; }
+  .trip-actions { gap: 5px; }
+  .trip-actions .btn-ghost { padding: 5px 9px; font-size: .75rem; }
+  .date-num { font-size: 1.5rem; min-width: 36px; }
+  .date-head { padding: 10px 12px; gap: 8px; }
+  .date-body { padding: 10px 12px; }
+  .vote-btn { font-size: .78rem; padding: 8px 6px; min-width: 60px; }
+  .sum-row { padding: 8px 10px; gap: 7px; }
+  .sum-date { font-size: .9rem; min-width: 24px; }
+  .sum-dow { font-size: .75rem; }
+  .sum-count { font-size: .8rem; }
+  .summary-card { padding: 14px 12px; }
+  .share-bar { padding: 7px 10px; }
+  .share-url { font-size: .7rem; }
+  .name-row input[type="text"] { max-width: 160px; }
+  .count-badges { gap: 4px; }
+  .count-pill { padding: 2px 6px; font-size: .66rem; }
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;
