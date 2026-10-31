@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>TripVote</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -844,7 +843,7 @@ function renderSummary(dates, responses) {
 
   // Build stats per date
   // Rule: no vote on a date = implicitly free (no objection)
-  const allVoterNames = [...allVoters];
+  const allVoterNamesArr = [...allVoters];
   const stats = dates.map(d => {
     const ds = iso(d);
     const dayResp = responses[ds] || {};
@@ -852,40 +851,41 @@ function renderSummary(dates, responses) {
     const notFreeSet = new Set(vals.filter(r => r.status === 'busy' || r.status === 'maybe').map(r => r.name));
     const busyCount = vals.filter(r => r.status === 'busy').length;
     // free = explicitly free + those who haven't voted at all
-    const freeNames = allVoterNames.filter(n => !notFreeSet.has(n));
+    const freeNames = allVoterNamesArr.filter(n => !notFreeSet.has(n));
     return { d, ds, freeN: freeNames.length, freeNames, busyCount, total: vals.length };
   });
 
-  // Sort by freeN desc, busyCount asc
-  const sorted = [...stats].filter(s => s.freeN > 0)
-    .sort((a, b) => b.freeN - a.freeN || a.busyCount - b.busyCount);
-
-  const allFree = sorted.filter(s => s.freeN === totalVoters && s.busyCount === 0);
-  const hasSomeFree = sorted.length > 0;
+  // Sort by busyCount asc, then freeN desc (fewest not-free first)
+  const sorted = [...stats].sort((a, b) => {
+    const aBusy = allVoterNames.length - a.freeNames.length;
+    const bBusy = allVoterNames.length - b.freeNames.length;
+    return aBusy - bBusy || b.freeNames.length - a.freeNames.length;
+  });
 
   let html = `<div class="summary-card">`;
   html += `<div class="summary-title">🗓 สรุปวันว่างร่วมกัน <span style="font-size:.75rem;font-weight:600;color:var(--fg3);text-transform:none;letter-spacing:0">(${totalVoters} คนตอบแล้ว)</span></div>`;
 
-  if (!hasSomeFree) {
-    html += `<div class="summary-empty">ยังไม่มีวันที่ใครว่างเลย</div>`;
-  } else {
-    const show = sorted.slice(0, 5);
-    for (const s of show) {
-      const isAllFree = s.freeN === totalVoters && s.busyCount === 0;
-      const pct = Math.round((s.freeN / totalVoters) * 100);
-      const names = s.freeNames.slice(0,4).map(n => esc(n)).join(', ')
-        + (s.freeNames.length > 4 ? ` +${s.freeNames.length-4}` : '');
-      html += `<div class="sum-row ${isAllFree?'all-free':'most-free'}">`;
-      html += `<div class="sum-date">${s.d.getDate()}</div>`;
-      html += `<div class="sum-dow">วัน${DOW[s.d.getDay()]}<br><span style="font-size:.72rem;color:var(--fg3)">${MON[s.d.getMonth()]} ${s.d.getFullYear()+543}</span></div>`;
-      html += `<div class="sum-bar"><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><div class="sum-names" style="margin-top:4px">${names}</div></div>`;
-      html += `<div class="sum-count">✓ ${s.freeN}/${totalVoters}</div>`;
-      if (isAllFree) html += `<div class="sum-star">ทุกคนว่าง!</div>`;
-      html += `</div>`;
-    }
-    if (sorted.length > 5) {
-      html += `<div style="font-size:.78rem;color:var(--fg3);text-align:center;padding:8px 0">และอีก ${sorted.length-5} วัน — ดูทั้งหมดด้านล่าง</div>`;
-    }
+  for (const s of sorted) {
+    const isAllFree = s.freeN === totalVoters && s.busyCount === 0;
+    const pct = Math.round((s.freeN / totalVoters) * 100);
+    // busy/maybe names
+    const dayResp = responses[s.ds] || {};
+    const busyNames = Object.values(dayResp).filter(r => r.status === 'busy').map(r => esc(r.name));
+    const maybeNames = Object.values(dayResp).filter(r => r.status === 'maybe').map(r => esc(r.name));
+    const freeNames = s.freeNames.map(n => esc(n));
+
+    let nameHtml = '';
+    if (freeNames.length) nameHtml += `<span style="color:var(--free)">✓ ${freeNames.join(', ')}</span>`;
+    if (maybeNames.length) nameHtml += `${freeNames.length?'  ':''}<span style="color:var(--maybe)">? ${maybeNames.join(', ')}</span>`;
+    if (busyNames.length) nameHtml += `${(freeNames.length||maybeNames.length)?'  ':''}<span style="color:var(--busy)">✗ ${busyNames.join(', ')}</span>`;
+
+    html += `<div class="sum-row ${isAllFree?'all-free':'most-free'}">`;
+    html += `<div class="sum-date">${s.d.getDate()}</div>`;
+    html += `<div class="sum-dow">วัน${DOW[s.d.getDay()]}<br><span style="font-size:.72rem;color:var(--fg3)">${MON[s.d.getMonth()]} ${s.d.getFullYear()+543}</span></div>`;
+    html += `<div class="sum-bar"><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><div class="sum-names" style="margin-top:4px;font-size:.75rem">${nameHtml}</div></div>`;
+    html += `<div class="sum-count">✓ ${s.freeN}/${totalVoters}</div>`;
+    if (isAllFree) html += `<div class="sum-star">ทุกคนว่าง!</div>`;
+    html += `</div>`;
   }
   html += `</div>`;
   wrap.innerHTML = html;
@@ -1132,5 +1132,3 @@ function toast(msg) {
 // ── Boot ──
 route();
 </script>
-
-</body></html>
