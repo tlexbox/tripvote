@@ -1,0 +1,1136 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>TripVote</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Prompt:wght@600;700;800&display=swap">
+
+<style>
+/* Layout: hash-routed SPA — / = home, #tripId = trip view */
+:root {
+  --bg: #f0f4f8;
+  --surface: #ffffff;
+  --surface2: #f8fafc;
+  --border: #e2e8f0;
+  --fg: #1a202c;
+  --fg2: #4a5568;
+  --fg3: #a0aec0;
+  --accent: #3b82f6;
+  --accent-dk: #2563eb;
+  --accent-bg: #eff6ff;
+  --free: #16a34a;
+  --free-bg: #f0fdf4;
+  --free-bd: #bbf7d0;
+  --busy: #dc2626;
+  --busy-bg: #fef2f2;
+  --busy-bd: #fecaca;
+  --maybe: #d97706;
+  --maybe-bg: #fffbeb;
+  --maybe-bd: #fde68a;
+  --font-h: 'Prompt', sans-serif;
+  --font-b: 'Sarabun', sans-serif;
+  --r: 14px;
+  --r-sm: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --fg: #e6edf3;
+    --fg2: #8b949e;
+    --fg3: #484f58;
+    --accent: #58a6ff;
+    --accent-dk: #79b8ff;
+    --accent-bg: #0d1f2d;
+    --free-bg: #0a1e11;
+    --free-bd: #1a4022;
+    --busy-bg: #1e0c0c;
+    --busy-bd: #4a1414;
+    --maybe-bg: #1e1507;
+    --maybe-bd: #4a3010;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
+  --border: #30363d; --fg: #e6edf3; --fg2: #8b949e; --fg3: #484f58;
+  --accent: #58a6ff; --accent-dk: #79b8ff; --accent-bg: #0d1f2d;
+  --free-bg: #0a1e11; --free-bd: #1a4022;
+  --busy-bg: #1e0c0c; --busy-bd: #4a1414;
+  --maybe-bg: #1e1507; --maybe-bd: #4a3010;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-b);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 40px;
+}
+
+/* ── Header ── */
+.appbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 28px;
+}
+.appbar-logo {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.appbar-title {
+  font-family: var(--font-h); font-size: 1.15rem; font-weight: 700;
+}
+.appbar-title em { color: var(--accent); font-style: normal; }
+
+/* ── Views ── */
+#view-home { max-width: 500px; margin: 0 auto; }
+#view-trip { max-width: 860px; margin: 0 auto; }
+
+/* ── Hero ── */
+.hero { text-align: center; margin-bottom: 28px; }
+.hero h1 {
+  font-family: var(--font-h); font-size: 1.65rem; font-weight: 800;
+  line-height: 1.35; text-wrap: balance; margin-bottom: 8px;
+}
+.hero p { color: var(--fg2); font-size: 0.93rem; line-height: 1.6; }
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 22px;
+}
+
+/* ── Form ── */
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+.label {
+  display: block; font-size: 0.78rem; font-weight: 700;
+  color: var(--fg2); text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: 6px;
+}
+input[type="text"], input[type="date"] {
+  width: 100%; padding: 10px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface2); color: var(--fg);
+  font-family: var(--font-b); font-size: 1rem;
+  outline: none; transition: border-color .15s;
+}
+input:focus { border-color: var(--accent); }
+.row-2 { display: flex; gap: 12px; }
+.row-2 .field { flex: 1; min-width: 0; }
+
+.day-picks {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+}
+.day-pick {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border: 1.5px solid var(--border); border-radius: 99px;
+  cursor: pointer; font-size: 0.88rem; font-weight: 600;
+  transition: all .15s; user-select: none;
+  background: var(--surface2); color: var(--fg2);
+}
+.day-pick input[type="checkbox"] { display: none; }
+.day-pick.on {
+  border-color: var(--accent); background: var(--accent-bg); color: var(--accent);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 18px; border-radius: var(--r-sm);
+  font-family: var(--font-b); font-size: 0.93rem; font-weight: 700;
+  border: none; cursor: pointer; transition: all .15s;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--accent); color: #fff; width: 100%; padding: 13px; font-size: 1rem; }
+.btn-primary:hover { background: var(--accent-dk); }
+.btn-ghost {
+  background: transparent; color: var(--fg2);
+  border: 1.5px solid var(--border); padding: 7px 14px; font-size: 0.83rem;
+}
+.btn-ghost:hover { border-color: var(--fg2); color: var(--fg); }
+.btn-sm { padding: 7px 14px; font-size: 0.83rem; }
+
+/* ── Notice ── */
+.notice {
+  border-radius: var(--r-sm); padding: 11px 14px;
+  font-size: 0.83rem; line-height: 1.5; margin-bottom: 16px;
+}
+.notice-warn { background: var(--maybe-bg); border: 1px solid var(--maybe-bd); }
+.notice-warn code { background: rgba(0,0,0,.08); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+
+/* ── Recent trips ── */
+.section-label {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--fg3); margin: 24px 0 10px;
+}
+.trip-list { display: flex; flex-direction: column; gap: 7px; }
+.trip-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 15px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm); text-decoration: none; color: inherit;
+  transition: border-color .15s;
+}
+.trip-item:hover { border-color: var(--accent); }
+.trip-item-body { flex: 1; min-width: 0; }
+.trip-item-name { font-weight: 700; font-size: .9rem; }
+.trip-item-sub { font-size: .78rem; color: var(--fg2); margin-top: 2px; }
+.trip-item-arrow { color: var(--fg3); font-size: 1.1rem; }
+
+/* ── Trip header ── */
+.trip-top {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.trip-top-info { flex: 1; min-width: 0; }
+.trip-name-big {
+  font-family: var(--font-h); font-size: 1.5rem; font-weight: 800;
+  line-height: 1.2; margin-bottom: 6px;
+}
+.trip-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .8rem; color: var(--fg2);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 99px; padding: 3px 11px;
+}
+.trip-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+
+/* ── Share bar ── */
+.share-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 13px;
+  background: var(--accent-bg); border: 1px solid #bfdbfe;
+  border-radius: var(--r-sm); margin-bottom: 20px; flex-wrap: wrap;
+}
+.share-lbl { font-size: .78rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.share-url {
+  flex: 1; min-width: 0; font-size: .78rem;
+  font-family: monospace; color: var(--accent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.copy-pill {
+  padding: 4px 12px; border-radius: 99px;
+  background: var(--accent); color: #fff;
+  font-size: .75rem; font-weight: 700;
+  border: none; cursor: pointer; white-space: nowrap; font-family: var(--font-b);
+}
+
+/* ── Name section ── */
+.name-row {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.name-row input[type="text"] { max-width: 220px; flex: 1; }
+.name-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 99px;
+  background: var(--accent); color: #fff;
+  font-weight: 700; font-size: .88rem;
+}
+
+/* ── Legend ── */
+.legend {
+  display: flex; gap: 18px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: .8rem; color: var(--fg2); }
+
+/* ── Date blocks ── */
+.date-grid { display: flex; flex-direction: column; gap: 14px; }
+.date-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.date-head {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.date-num {
+  font-family: var(--font-h); font-size: 2rem; font-weight: 800;
+  line-height: 1; color: var(--accent);
+  font-variant-numeric: tabular-nums; min-width: 48px;
+}
+.date-info-col { flex: 1; min-width: 0; }
+.date-dow { font-weight: 700; font-size: .95rem; }
+.date-mon { font-size: .78rem; color: var(--fg2); margin-top: 1px; }
+.count-badges { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+.count-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 99px;
+  font-size: .72rem; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pill-free { background: var(--free-bg); color: var(--free); border: 1px solid var(--free-bd); }
+.pill-busy { background: var(--busy-bg); color: var(--busy); border: 1px solid var(--busy-bd); }
+
+.date-body { padding: 13px 18px; }
+.chips-row {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  min-height: 30px; margin-bottom: 12px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 11px; border-radius: 99px;
+  font-size: .8rem; font-weight: 700; border: 1px solid transparent;
+}
+.chip-free { background: var(--free-bg); color: var(--free); border-color: var(--free-bd); }
+.chip-busy { background: var(--busy-bg); color: var(--busy); border-color: var(--busy-bd); }
+.chip-maybe { background: var(--maybe-bg); color: var(--maybe); border-color: var(--maybe-bd); }
+.chip-none { font-size: .78rem; color: var(--fg3); padding: 4px 0; font-style: italic; }
+
+.vote-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.vote-btn {
+  flex: 1; min-width: 80px; padding: 9px 10px;
+  border: 2px solid var(--border); border-radius: var(--r-sm);
+  background: transparent; color: var(--fg2);
+  font-family: var(--font-b); font-size: .85rem; font-weight: 700;
+  cursor: pointer; transition: all .12s;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.vote-btn:hover { border-color: var(--fg2); color: var(--fg); }
+.vote-btn.sel-free { background: var(--free-bg); border-color: var(--free); color: var(--free); }
+.vote-btn.sel-busy { background: var(--busy-bg); border-color: var(--busy); color: var(--busy); }
+.vote-btn.sel-maybe { background: var(--maybe-bg); border-color: var(--maybe); color: var(--maybe); }
+.no-name-hint {
+  font-size: .8rem; color: var(--fg3); text-align: center; padding: 6px; font-style: italic;
+}
+
+/* ── Spinner / empty ── */
+.spinner-wrap { text-align: center; padding: 60px 0; color: var(--fg2); }
+.spinner {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  animation: spin .7s linear infinite; margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 36px 0; color: var(--fg3); font-size: .9rem; }
+
+/* ── Back btn ── */
+.back {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .83rem; font-weight: 700; color: var(--fg2);
+  background: none; border: none; cursor: pointer; padding: 4px 0; margin-bottom: 18px;
+}
+.back:hover { color: var(--fg); }
+
+/* ── Modal overlay ── */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5); backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 20px;
+}
+.modal-bg.hidden { display: none; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 26px 24px;
+  width: 100%; max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.modal-title {
+  font-family: var(--font-h); font-size: 1.1rem; font-weight: 800;
+  margin-bottom: 20px;
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+.btn-danger { background: var(--busy); color: #fff; }
+.btn-danger:hover { background: #b91c1c; }
+
+/* ── Firebase rules hint ── */
+.rules-box {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 14px 16px;
+  font-size: .8rem; margin-top: 20px;
+}
+.rules-box pre {
+  background: var(--bg); border-radius: 6px; padding: 10px;
+  font-size: .75rem; overflow-x: auto; margin-top: 8px; line-height: 1.5;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%) translateY(14px);
+  background: var(--fg); color: var(--bg);
+  padding: 9px 20px; border-radius: 99px;
+  font-size: .85rem; font-weight: 700;
+  pointer-events: none; opacity: 0; transition: opacity .2s, transform .2s;
+  white-space: nowrap; z-index: 999;
+}
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Summary card ── */
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+.summary-title {
+  font-family: var(--font-h); font-size: .9rem; font-weight: 700;
+  color: var(--fg2); text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.summary-empty { font-size: .85rem; color: var(--fg3); font-style: italic; }
+
+.sum-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  margin-bottom: 8px; flex-wrap: wrap;
+  transition: border-color .15s;
+}
+.sum-row:last-child { margin-bottom: 0; }
+.sum-row.all-free {
+  background: var(--free-bg); border-color: var(--free-bd);
+}
+.sum-row.most-free {
+  background: var(--surface2);
+}
+.sum-date { font-weight: 800; font-size: 1rem; font-variant-numeric: tabular-nums; min-width: 30px; }
+.sum-dow { font-size: .82rem; color: var(--fg2); font-weight: 600; }
+.sum-bar { flex: 1; min-width: 80px; }
+.bar-track {
+  height: 8px; border-radius: 99px;
+  background: var(--border); overflow: hidden;
+}
+.bar-fill {
+  height: 100%; border-radius: 99px;
+  background: var(--free); transition: width .3s;
+}
+.sum-names { font-size: .78rem; color: var(--fg2); }
+.sum-star {
+  font-size: .72rem; font-weight: 800; padding: 2px 8px;
+  border-radius: 99px; white-space: nowrap;
+  background: var(--free); color: #fff;
+}
+.sum-count {
+  font-size: .8rem; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--free); min-width: 32px; text-align: right;
+}
+
+/* ── Realtime dot ── */
+.rt-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--free); margin-left: 8px; display: inline-block;
+  animation: pulse 2s ease infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+</style>
+
+<!-- Firebase Realtime Database -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-database-compat.min.js"></script>
+
+<div id="app">
+
+  <!-- ── HOME VIEW ── -->
+  <div id="home" hidden>
+    <header class="appbar">
+      <div class="appbar-logo">🗓</div>
+      <div class="appbar-title">Trip<em>Vote</em></div>
+    </header>
+
+    <div class="hero">
+      <h1>หาวันไปเที่ยวกับเพื่อน<br>ไม่ต้องนัดกัน</h1>
+      <p>สร้างทริป → แชร์ลิงก์ → เพื่อนติ๊กว่างหรือไม่ว่าง<br>เห็นผลพร้อมกัน แบบ real-time</p>
+    </div>
+
+    <div id="cfg-warn" class="notice notice-warn" hidden>
+      ⚠️ ยังไม่ได้ตั้งค่า Firebase — ข้อมูลจะไม่ sync กับคนอื่น<br>
+      ใส่ค่า <code>firebaseConfig</code> ในโค้ด แล้วตั้ง Realtime Database rules ด้านล่าง
+      <div class="rules-box" style="margin-top:10px">
+        <strong>Database Rules ที่ต้องตั้ง (Realtime Database → Rules):</strong>
+        <pre>{
+  "rules": {
+    "trips": {
+      "$tripId": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label class="label">ชื่อทริป</label>
+        <input type="text" id="inp-name" placeholder="เช่น ทริปเหนือเดือนพฤศจิกา" />
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label class="label">วันเริ่มต้น</label>
+          <input type="date" id="inp-start" />
+        </div>
+        <div class="field">
+          <label class="label">วันสิ้นสุด</label>
+          <input type="date" id="inp-end" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">แสดงวัน</label>
+        <div class="day-picks">
+          <label class="day-pick on" id="lbl-sat">
+            <input type="checkbox" id="chk-sat" checked> วันเสาร์
+          </label>
+          <label class="day-pick on" id="lbl-sun">
+            <input type="checkbox" id="chk-sun" checked> วันอาทิตย์
+          </label>
+          <label class="day-pick" id="lbl-wd">
+            <input type="checkbox" id="chk-wd"> วันธรรมดาด้วย
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:14px" onclick="createTrip()">
+      ✨ สร้างทริป &amp; คัดลอกลิงก์
+    </button>
+
+    <div id="recent-sec" hidden>
+      <div class="section-label">ทริปที่สร้างล่าสุด</div>
+      <div class="trip-list" id="recent-list"></div>
+    </div>
+  </div>
+
+  <!-- ── TRIP VIEW ── -->
+  <div id="trip-view" hidden>
+    <button class="back" onclick="goHome()">← กลับหน้าหลัก</button>
+
+    <div class="trip-top">
+      <div class="trip-top-info">
+        <div class="trip-name-big" id="tv-name">—</div>
+        <div class="trip-badge" id="tv-dates">📅 —</div>
+        <span class="rt-dot" id="rt-dot" hidden title="เชื่อมต่อ real-time"></span>
+      </div>
+      <div class="trip-actions">
+        <button class="btn btn-ghost btn-sm" onclick="copyLink()">🔗 แชร์ลิงก์</button>
+        <button class="btn btn-ghost btn-sm" id="btn-edit-trip" onclick="openEditModal()" hidden>✏️ แก้ไข</button>
+        <button class="btn btn-ghost btn-sm" id="btn-delete-trip" onclick="openDeleteModal()" hidden style="color:var(--busy);border-color:var(--busy-bd)">🗑️ ลบ</button>
+        <button class="btn btn-ghost btn-sm" onclick="goHome()">+ ทริปใหม่</button>
+      </div>
+    </div>
+
+    <div class="share-bar">
+      <span class="share-lbl">ส่งลิงก์ให้เพื่อน:</span>
+      <span class="share-url" id="tv-url">—</span>
+      <button class="copy-pill" onclick="copyLink()">คัดลอก</button>
+    </div>
+
+    <div class="name-row">
+      <div id="name-chip-wrap" hidden>
+        <div class="name-chip" id="name-chip">👤</div>
+      </div>
+      <input type="text" id="inp-my-name" placeholder="ใส่ชื่อของคุณก่อน..." style="max-width:220px" />
+      <button class="btn btn-ghost btn-sm" onclick="setMyName()">ตกลง</button>
+    </div>
+
+    <div id="tv-summary" hidden></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--free)"></span> ว่าง</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--busy)"></span> ไม่ว่าง</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--maybe)"></span> ไม่แน่</div>
+    </div>
+
+    <div id="tv-loading" class="spinner-wrap">
+      <div class="spinner"></div>
+      กำลังโหลด...
+    </div>
+
+    <div class="date-grid" id="tv-grid"></div>
+  </div>
+
+</div>
+
+<!-- Edit modal -->
+<div class="modal-bg hidden" id="modal-edit">
+  <div class="modal">
+    <div class="modal-title">✏️ แก้ไขทริป</div>
+    <div class="field">
+      <label class="label">ชื่อทริป</label>
+      <input type="text" id="edit-name" />
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label class="label">วันเริ่มต้น</label>
+        <input type="date" id="edit-start" />
+      </div>
+      <div class="field">
+        <label class="label">วันสิ้นสุด</label>
+        <input type="date" id="edit-end" />
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">แสดงวัน</label>
+      <div class="day-picks">
+        <label class="day-pick" id="edit-lbl-sat"><input type="checkbox" id="edit-sat"> วันเสาร์</label>
+        <label class="day-pick" id="edit-lbl-sun"><input type="checkbox" id="edit-sun"> วันอาทิตย์</label>
+        <label class="day-pick" id="edit-lbl-wd"><input type="checkbox" id="edit-wd"> วันธรรมดาด้วย</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">ยกเลิก</button>
+      <button class="btn btn-primary" style="width:auto" onclick="saveEdit()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="modal-bg hidden" id="modal-delete">
+  <div class="modal">
+    <div class="modal-title">🗑️ ลบทริปนี้?</div>
+    <p style="color:var(--fg2);font-size:.9rem;line-height:1.6">ข้อมูลทริปและการ vote ทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-delete')">ยกเลิก</button>
+      <button class="btn btn-danger" onclick="deleteTrip()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  ⬇️ ใส่ Firebase config ของคุณตรงนี้
+// ════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "AIzaSyAMhI_m7_KG9AfX787rzggZ3fddRD8gJwA",
+  authDomain:        "tripvote-app-tlex.firebaseapp.com",
+  databaseURL:       "https://tripvote-app-tlex-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "tripvote-app-tlex",
+  storageBucket:     "tripvote-app-tlex.firebasestorage.app",
+  messagingSenderId: "747609858464",
+  appId:             "1:747609858464:web:9e11271ea22a70d59d44c5"
+};
+// ════════════════════════════════════════════════
+
+const HAS_FIREBASE = !firebaseConfig.apiKey.includes("YOUR_");
+let db = null;
+if (HAS_FIREBASE) {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+}
+
+// ── State ──
+let myName = '';
+let currentId = null;
+let activeRef = null;
+let localData = {};    // fallback no-Firebase store
+let currentInfo = {}; // cached trip info for editing
+
+// ── Thai date helpers ──
+const DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+const MON = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const fmtDate = d => `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()+543}`;
+const iso = d => d.toISOString().slice(0,10);
+const dateOf = s => new Date(s + 'T00:00:00');
+
+// ── Routing ──
+function route() {
+  const h = location.hash.slice(1);
+  if (h && h.length >= 6) openTrip(h);
+  else openHome();
+}
+window.addEventListener('hashchange', route);
+
+// ── HOME ──
+function openHome() {
+  document.getElementById('trip-view').hidden = true;
+  document.getElementById('home').hidden = false;
+  if (activeRef) { activeRef.off(); activeRef = null; }
+  if (!HAS_FIREBASE) document.getElementById('cfg-warn').hidden = false;
+
+  // defaults: this month to next month
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  document.getElementById('inp-start').value = iso(new Date(y,m,1));
+  document.getElementById('inp-end').value = iso(new Date(y,m+2,0));
+
+  // Restore checkbox states
+  ['sat','sun','wd'].forEach(k => {
+    const el = document.getElementById('chk-'+k);
+    const lbl = document.getElementById('lbl-'+k);
+    lbl.classList.toggle('on', el.checked);
+  });
+
+  loadRecent();
+}
+
+// Wire checkbox → pill styling
+['sat','sun','wd'].forEach(k => {
+  document.getElementById('chk-'+k).addEventListener('change', function() {
+    document.getElementById('lbl-'+k).classList.toggle('on', this.checked);
+  });
+});
+
+function goHome() {
+  location.hash = '';
+  openHome();
+}
+
+function loadRecent() {
+  try {
+    const list = JSON.parse(localStorage.getItem('tv_recent') || '[]');
+    const sec = document.getElementById('recent-sec');
+    const ul = document.getElementById('recent-list');
+    if (!list.length) { sec.hidden = true; return; }
+    sec.hidden = false;
+    ul.innerHTML = list.slice(0,5).map(t => `
+      <a class="trip-item" href="#${t.id}">
+        <div style="font-size:1.2rem">🗺️</div>
+        <div class="trip-item-body">
+          <div class="trip-item-name">${esc(t.name)}</div>
+          <div class="trip-item-sub">${t.start} → ${t.end}</div>
+        </div>
+        <div class="trip-item-arrow">›</div>
+      </a>`).join('');
+  } catch(e) {}
+}
+
+// ── CREATE TRIP ──
+function createTrip() {
+  const name   = document.getElementById('inp-name').value.trim();
+  const start  = document.getElementById('inp-start').value;
+  const end    = document.getElementById('inp-end').value;
+  const incSat = document.getElementById('chk-sat').checked;
+  const incSun = document.getElementById('chk-sun').checked;
+  const incWd  = document.getElementById('chk-wd').checked;
+
+  if (!name)       return toast('ใส่ชื่อทริปก่อนนะ');
+  if (!start||!end) return toast('เลือกช่วงวันที่ด้วย');
+  if (start > end)  return toast('วันเริ่มต้องมาก่อนวันสิ้นสุด');
+  if (!incSat && !incSun && !incWd) return toast('เลือกวันที่อยากแสดงด้วย');
+
+  const id = genId();
+  const ownerToken = genId(); // secret token stored locally
+  const info = { name, start, end, incSat, incSun, incWd, createdAt: Date.now(), ownerToken };
+
+  // Save owner token to localStorage
+  try { localStorage.setItem(`tv_own_${id}`, ownerToken); } catch(e) {}
+
+  if (db) {
+    db.ref(`trips/${id}/info`).set(info);
+  } else {
+    localData[id] = { info, responses: {} };
+  }
+
+  saveRecent({ id, name, start, end });
+  location.hash = id;
+  setTimeout(() => copyLink(), 200);
+}
+
+function genId() {
+  const a = Math.random().toString(36).slice(2,9);
+  const b = Math.random().toString(36).slice(2,6);
+  return a + b;
+}
+
+function saveRecent(entry) {
+  try {
+    const r = JSON.parse(localStorage.getItem('tv_recent') || '[]');
+    const filtered = r.filter(x => x.id !== entry.id);
+    filtered.unshift(entry);
+    localStorage.setItem('tv_recent', JSON.stringify(filtered.slice(0,10)));
+  } catch(e) {}
+}
+
+// ── TRIP VIEW ──
+function openTrip(id) {
+  currentId = id;
+  document.getElementById('home').hidden = true;
+  document.getElementById('trip-view').hidden = false;
+  document.getElementById('tv-loading').hidden = false;
+  document.getElementById('tv-grid').innerHTML = '';
+  document.getElementById('rt-dot').hidden = true;
+
+  const url = `${location.href.split('#')[0]}#${id}`;
+  document.getElementById('tv-url').textContent = url;
+
+  // Restore saved name
+  try {
+    myName = localStorage.getItem('tv_myname') || '';
+    if (myName) refreshNameUI();
+  } catch(e) {}
+
+  if (activeRef) { activeRef.off(); activeRef = null; }
+
+  if (db) {
+    activeRef = db.ref(`trips/${id}`);
+    activeRef.on('value', snap => {
+      document.getElementById('tv-loading').hidden = true;
+      document.getElementById('rt-dot').hidden = false;
+      const data = snap.val();
+      if (!data) {
+        document.getElementById('tv-grid').innerHTML = '<div class="empty">ไม่พบทริปนี้</div>';
+        return;
+      }
+      renderTrip(data);
+    });
+  } else {
+    document.getElementById('tv-loading').hidden = true;
+    const data = localData[id];
+    if (data) renderTrip(data);
+    else document.getElementById('tv-grid').innerHTML =
+      '<div class="empty">ตั้งค่า Firebase เพื่อโหลดทริปที่แชร์จากคนอื่น</div>';
+  }
+}
+
+// ── RENDER ──
+function renderTrip(data) {
+  const info = data.info || {};
+  const responses = data.responses || {};
+  currentInfo = info;
+
+  document.getElementById('tv-name').textContent = info.name || 'ทริปนี้';
+  document.getElementById('tv-dates').textContent =
+    `📅 ${fmtDate(dateOf(info.start))} → ${fmtDate(dateOf(info.end))}`;
+
+  // Show owner controls if token matches
+  const storedToken = (() => { try { return localStorage.getItem(`tv_own_${currentId}`); } catch(e) { return null; } })();
+  const isOwner = storedToken && info.ownerToken && storedToken === info.ownerToken;
+  document.getElementById('btn-edit-trip').hidden = !isOwner;
+  document.getElementById('btn-delete-trip').hidden = !isOwner;
+
+  const dates = buildDates(info);
+  const grid = document.getElementById('tv-grid');
+  if (!dates.length) {
+    grid.innerHTML = '<div class="empty">ไม่มีวันที่ตรงกับเงื่อนไข</div>';
+    document.getElementById('tv-summary').hidden = true;
+    return;
+  }
+  renderSummary(dates, responses);
+  grid.innerHTML = dates.map(d => renderBlock(d, responses)).join('');
+}
+
+// ── SUMMARY ──
+function renderSummary(dates, responses) {
+  const wrap = document.getElementById('tv-summary');
+
+  // Collect all unique voters across all dates
+  const allVoters = new Set();
+  for (const ds in responses) {
+    for (const v of Object.values(responses[ds])) allVoters.add(v.name);
+  }
+  const totalVoters = allVoters.size;
+
+  if (totalVoters === 0) {
+    wrap.innerHTML = `<div class="summary-card">
+      <div class="summary-title">🗓 สรุปวันว่างร่วมกัน</div>
+      <div class="summary-empty">ยังไม่มีใครติ๊กเลย — แชร์ลิงก์ให้เพื่อนมาติ๊กก่อนนะ</div>
+    </div>`;
+    wrap.hidden = false;
+    return;
+  }
+
+  // Build stats per date
+  // Rule: no vote on a date = implicitly free (no objection)
+  const allVoterNames = [...allVoters];
+  const stats = dates.map(d => {
+    const ds = iso(d);
+    const dayResp = responses[ds] || {};
+    const vals = Object.values(dayResp);
+    const notFreeSet = new Set(vals.filter(r => r.status === 'busy' || r.status === 'maybe').map(r => r.name));
+    const busyCount = vals.filter(r => r.status === 'busy').length;
+    // free = explicitly free + those who haven't voted at all
+    const freeNames = allVoterNames.filter(n => !notFreeSet.has(n));
+    return { d, ds, freeN: freeNames.length, freeNames, busyCount, total: vals.length };
+  });
+
+  // Sort by freeN desc, busyCount asc
+  const sorted = [...stats].filter(s => s.freeN > 0)
+    .sort((a, b) => b.freeN - a.freeN || a.busyCount - b.busyCount);
+
+  const allFree = sorted.filter(s => s.freeN === totalVoters && s.busyCount === 0);
+  const hasSomeFree = sorted.length > 0;
+
+  let html = `<div class="summary-card">`;
+  html += `<div class="summary-title">🗓 สรุปวันว่างร่วมกัน <span style="font-size:.75rem;font-weight:600;color:var(--fg3);text-transform:none;letter-spacing:0">(${totalVoters} คนตอบแล้ว)</span></div>`;
+
+  if (!hasSomeFree) {
+    html += `<div class="summary-empty">ยังไม่มีวันที่ใครว่างเลย</div>`;
+  } else {
+    const show = sorted.slice(0, 5);
+    for (const s of show) {
+      const isAllFree = s.freeN === totalVoters && s.busyCount === 0;
+      const pct = Math.round((s.freeN / totalVoters) * 100);
+      const names = s.freeNames.slice(0,4).map(n => esc(n)).join(', ')
+        + (s.freeNames.length > 4 ? ` +${s.freeNames.length-4}` : '');
+      html += `<div class="sum-row ${isAllFree?'all-free':'most-free'}">`;
+      html += `<div class="sum-date">${s.d.getDate()}</div>`;
+      html += `<div class="sum-dow">วัน${DOW[s.d.getDay()]}<br><span style="font-size:.72rem;color:var(--fg3)">${MON[s.d.getMonth()]} ${s.d.getFullYear()+543}</span></div>`;
+      html += `<div class="sum-bar"><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><div class="sum-names" style="margin-top:4px">${names}</div></div>`;
+      html += `<div class="sum-count">✓ ${s.freeN}/${totalVoters}</div>`;
+      if (isAllFree) html += `<div class="sum-star">ทุกคนว่าง!</div>`;
+      html += `</div>`;
+    }
+    if (sorted.length > 5) {
+      html += `<div style="font-size:.78rem;color:var(--fg3);text-align:center;padding:8px 0">และอีก ${sorted.length-5} วัน — ดูทั้งหมดด้านล่าง</div>`;
+    }
+  }
+  html += `</div>`;
+  wrap.innerHTML = html;
+  wrap.hidden = false;
+}
+
+function buildDates(info) {
+  const out = [];
+  if (!info.start || !info.end) return out;
+  const s = dateOf(info.start), e = dateOf(info.end);
+  for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) {
+    const wd = d.getDay();
+    if (info.incWd) { out.push(new Date(d)); continue; }
+    if (info.incSat && wd===6) { out.push(new Date(d)); continue; }
+    if (info.incSun && wd===0) { out.push(new Date(d)); continue; }
+  }
+  return out;
+}
+
+function renderBlock(d, responses) {
+  const ds = iso(d);
+  const dayResp = responses[ds] || {};
+  let freeN=0, busyN=0;
+  const chips = Object.values(dayResp).map(r => {
+    if (r.status==='free') freeN++;
+    if (r.status==='busy') busyN++;
+    const cls = r.status==='free'?'chip-free':r.status==='busy'?'chip-busy':'chip-maybe';
+    const ic  = r.status==='free'?'✓':r.status==='busy'?'✗':'?';
+    return `<div class="chip ${cls}">${ic} ${esc(r.name)}</div>`;
+  }).join('');
+
+  const myKey = myName ? safeKey(myName) : '';
+  const myStatus = myKey && dayResp[myKey] ? dayResp[myKey].status : '';
+
+  const voteHtml = myName
+    ? `<div class="vote-row">
+        <button class="vote-btn${myStatus==='free'?' sel-free':''}" onclick="vote('${ds}','free')">✓ ว่าง</button>
+        <button class="vote-btn${myStatus==='maybe'?' sel-maybe':''}" onclick="vote('${ds}','maybe')">? ไม่แน่</button>
+        <button class="vote-btn${myStatus==='busy'?' sel-busy':''}" onclick="vote('${ds}','busy')">✗ ไม่ว่าง</button>
+      </div>`
+    : `<div class="no-name-hint">ใส่ชื่อของคุณด้านบนก่อนเพื่อติ๊กวัน</div>`;
+
+  return `<div class="date-block">
+    <div class="date-head">
+      <div class="date-num">${d.getDate()}</div>
+      <div class="date-info-col">
+        <div class="date-dow">วัน${DOW[d.getDay()]}</div>
+        <div class="date-mon">${MON[d.getMonth()]} ${d.getFullYear()+543}</div>
+      </div>
+      <div class="count-badges">
+        <div class="count-pill pill-free">✓ ${freeN}</div>
+        <div class="count-pill pill-busy">✗ ${busyN}</div>
+      </div>
+    </div>
+    <div class="date-body">
+      <div class="chips-row">${chips||'<div class="chip-none">ยังไม่มีใครติ๊ก</div>'}</div>
+      ${voteHtml}
+    </div>
+  </div>`;
+}
+
+// ── NAME ──
+function setMyName() {
+  const v = document.getElementById('inp-my-name').value.trim();
+  if (!v) return toast('ใส่ชื่อก่อนนะ');
+  myName = v;
+  try { localStorage.setItem('tv_myname', myName); } catch(e) {}
+  refreshNameUI();
+  toast(`สวัสดี ${myName}! ติ๊กวันได้เลย 👋`);
+  // Re-render with name
+  if (db && activeRef) {
+    activeRef.once('value').then(s => { if(s.val()) renderTrip(s.val()); });
+  } else if (localData[currentId]) renderTrip(localData[currentId]);
+}
+
+function refreshNameUI() {
+  document.getElementById('inp-my-name').value = myName;
+  document.getElementById('name-chip').textContent = `👤 ${myName}`;
+  document.getElementById('name-chip-wrap').hidden = false;
+}
+
+// ── VOTE ──
+function vote(dateStr, status) {
+  if (!myName) return toast('ใส่ชื่อก่อนนะ');
+  const key = safeKey(myName);
+  const path = `trips/${currentId}/responses/${dateStr}/${key}`;
+
+  // Toggle off same status
+  const toggleOff = (() => {
+    try {
+      const block = document.querySelector(`[data-date="${dateStr}"]`);
+      if (!block) return false;
+    } catch(e) {}
+    return false;
+  })();
+
+  const entry = { name: myName, status };
+
+  if (db) {
+    // Check current then toggle
+    db.ref(path).once('value').then(s => {
+      const cur = s.val();
+      if (cur && cur.status === status) {
+        db.ref(path).remove();
+      } else {
+        db.ref(path).set(entry);
+      }
+    });
+  } else {
+    if (!localData[currentId]) return;
+    const resp = localData[currentId].responses;
+    if (!resp[dateStr]) resp[dateStr] = {};
+    const cur = resp[dateStr][key];
+    if (cur && cur.status === status) {
+      delete resp[dateStr][key];
+    } else {
+      resp[dateStr][key] = entry;
+    }
+    renderTrip(localData[currentId]);
+  }
+}
+
+// ── EDIT & DELETE ──
+function openEditModal() {
+  const i = currentInfo;
+  document.getElementById('edit-name').value  = i.name  || '';
+  document.getElementById('edit-start').value = i.start || '';
+  document.getElementById('edit-end').value   = i.end   || '';
+  ['sat','sun','wd'].forEach(k => {
+    const chk = document.getElementById(`edit-${k}`);
+    const lbl = document.getElementById(`edit-lbl-${k}`);
+    const val = k==='sat' ? i.incSat : k==='sun' ? i.incSun : i.incWd;
+    chk.checked = !!val;
+    lbl.classList.toggle('on', !!val);
+  });
+  ['sat','sun','wd'].forEach(k => {
+    const el = document.getElementById(`edit-${k}`);
+    el.onchange = function() { document.getElementById(`edit-lbl-${k}`).classList.toggle('on', this.checked); };
+  });
+  document.getElementById('modal-edit').classList.remove('hidden');
+}
+
+function saveEdit() {
+  const name  = document.getElementById('edit-name').value.trim();
+  const start = document.getElementById('edit-start').value;
+  const end   = document.getElementById('edit-end').value;
+  const incSat = document.getElementById('edit-sat').checked;
+  const incSun = document.getElementById('edit-sun').checked;
+  const incWd  = document.getElementById('edit-wd').checked;
+
+  if (!name)        return toast('ใส่ชื่อทริปก่อนนะ');
+  if (!start||!end) return toast('เลือกช่วงวันที่ด้วย');
+  if (start > end)  return toast('วันเริ่มต้องมาก่อนวันสิ้นสุด');
+  if (!incSat && !incSun && !incWd) return toast('เลือกวันที่อยากแสดงด้วย');
+
+  const updated = { ...currentInfo, name, start, end, incSat, incSun, incWd };
+  if (db) {
+    db.ref(`trips/${currentId}/info`).set(updated)
+      .then(() => { closeModal('modal-edit'); toast('บันทึกแล้ว ✓'); })
+      .catch(() => toast('เกิดข้อผิดพลาด'));
+  } else {
+    if (localData[currentId]) localData[currentId].info = updated;
+    renderTrip(localData[currentId]);
+    closeModal('modal-edit');
+    toast('บันทึกแล้ว ✓');
+  }
+  // Update recent list
+  saveRecent({ id: currentId, name, start, end });
+}
+
+function openDeleteModal() {
+  document.getElementById('modal-delete').classList.remove('hidden');
+}
+
+function deleteTrip() {
+  if (db) {
+    db.ref(`trips/${currentId}`).remove()
+      .then(() => {
+        try { localStorage.removeItem(`tv_own_${currentId}`); } catch(e) {}
+        removeRecent(currentId);
+        closeModal('modal-delete');
+        goHome();
+        toast('ลบทริปแล้ว');
+      })
+      .catch(() => toast('เกิดข้อผิดพลาด'));
+  } else {
+    delete localData[currentId];
+    removeRecent(currentId);
+    closeModal('modal-delete');
+    goHome();
+    toast('ลบทริปแล้ว');
+  }
+}
+
+function removeRecent(id) {
+  try {
+    const r = JSON.parse(localStorage.getItem('tv_recent') || '[]');
+    localStorage.setItem('tv_recent', JSON.stringify(r.filter(x => x.id !== id)));
+  } catch(e) {}
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+// Close modal on bg click
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.add('hidden'); });
+});
+
+// ── UTILS ──
+function safeKey(name) {
+  // Firebase RTDB key: no . # $ / [ ]
+  return name.replace(/[.#$\/\[\]]/g,'_').slice(0, 40);
+}
+
+function copyLink() {
+  const url = `${location.href.split('#')[0]}#${currentId||''}`;
+  navigator.clipboard.writeText(url)
+    .then(() => toast('คัดลอกลิงก์แล้ว ✓'))
+    .catch(() => {
+      const t = document.createElement('textarea');
+      t.value = url; document.body.appendChild(t); t.select();
+      document.execCommand('copy'); t.remove();
+      toast('คัดลอกลิงก์แล้ว ✓');
+    });
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 2400);
+}
+
+// ── Boot ──
+route();
+</script>
+
+</body></html>
