@@ -894,6 +894,8 @@ function renderTrip(data) {
 // ── SUMMARY ──
 function renderSummary(dates, responses) {
   const wrap = document.getElementById('tv-summary');
+  // Remember current open state before re-render
+  const wasOpen = wrap.querySelector('.summary-body.open') !== null;
 
   // Collect all unique voters across all dates
   const allVoters = new Set();
@@ -909,6 +911,7 @@ function renderSummary(dates, responses) {
       </div>
       <div class="summary-body"><div class="summary-empty">ยังไม่มีใครติ๊กเลย — แชร์ลิงก์ให้เพื่อนมาติ๊กก่อนนะ</div></div>
     </div>`;
+    if (wasOpen) restoreSummaryOpen(wrap);
     wrap.hidden = false;
     return;
   }
@@ -962,7 +965,15 @@ function renderSummary(dates, responses) {
   }
   html += `</div></div>`;
   wrap.innerHTML = html;
+  if (wasOpen) restoreSummaryOpen(wrap);
   wrap.hidden = false;
+}
+
+function restoreSummaryOpen(wrap) {
+  const body = wrap.querySelector('.summary-body');
+  const chevron = wrap.querySelector('.sum-chevron');
+  if (body) body.classList.add('open');
+  if (chevron) chevron.style.transform = 'rotate(90deg)';
 }
 
 function toggleSummary(titleEl) {
