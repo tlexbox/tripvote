@@ -548,6 +548,7 @@ input:focus { border-color: var(--accent); }
       <div class="trip-actions">
         <button class="btn btn-ghost btn-sm" onclick="copyLink()">🔗 แชร์ลิงก์</button>
         <button class="btn btn-ghost btn-sm" id="btn-edit-trip" onclick="openEditModal()" hidden>✏️ แก้ไข</button>
+        <button class="btn btn-ghost btn-sm" id="btn-manage-voters" onclick="openManageVoters()" hidden>👥 จัดการ</button>
         <button class="btn btn-ghost btn-sm" id="btn-delete-trip" onclick="openDeleteModal()" hidden style="color:var(--busy);border-color:var(--busy-bd)">🗑️ ลบ</button>
         <button class="btn btn-ghost btn-sm" onclick="goHome()">+ ทริปใหม่</button>
       </div>
@@ -630,6 +631,17 @@ input:focus { border-color: var(--accent); }
   </div>
 </div>
 
+<div class="modal-bg hidden" id="modal-manage-voters">
+  <div class="modal">
+    <div class="modal-title">👥 จัดการผู้ Vote</div>
+    <p style="color:var(--fg2);font-size:.85rem;margin-bottom:14px;line-height:1.6">ลบ vote ของใครออกทั้งหมด เพื่อให้เริ่ม vote ใหม่ หรือแก้ชื่อที่พิมพ์ผิด</p>
+    <div id="voter-list" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-manage-voters')">ปิด</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -660,6 +672,7 @@ let currentId = null;
 let activeRef = null;
 let localData = {};    // fallback no-Firebase store
 let currentInfo = {}; // cached trip info for editing
+let currentResponses = {}; // cached responses for manage-voters
 
 // ── Thai date helpers ──
 const DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
@@ -823,6 +836,7 @@ function renderTrip(data) {
   const info = data.info || {};
   const responses = data.responses || {};
   currentInfo = info;
+  currentResponses = responses;
 
   document.getElementById('tv-name').textContent = info.name || 'ทริปนี้';
   document.getElementById('tv-dates').textContent =
@@ -832,6 +846,7 @@ function renderTrip(data) {
   const storedToken = (() => { try { return localStorage.getItem(`tv_own_${currentId}`); } catch(e) { return null; } })();
   const isOwner = storedToken && info.ownerToken && storedToken === info.ownerToken;
   document.getElementById('btn-edit-trip').hidden = !isOwner;
+  document.getElementById('btn-manage-voters').hidden = !isOwner;
   document.getElementById('btn-delete-trip').hidden = !isOwner;
 
   const dates = buildDates(info);
@@ -1078,6 +1093,55 @@ function saveEdit() {
   }
   // Update recent list
   saveRecent({ id: currentId, name, start, end });
+}
+
+function openManageVoters() {
+  // Collect all unique voters from current responses
+  const responses = currentResponses || {};
+  const voters = new Map(); // name -> count of votes
+  for (const ds in responses) {
+    for (const v of Object.values(responses[ds])) {
+      voters.set(v.name, (voters.get(v.name) || 0) + 1);
+    }
+  }
+  const list = document.getElementById('voter-list');
+  if (voters.size === 0) {
+    list.innerHTML = '<div style="color:var(--fg3);font-size:.85rem;text-align:center;padding:12px">ยังไม่มีใคร vote</div>';
+  } else {
+    list.innerHTML = [...voters.entries()].map(([name, cnt]) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface2)">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.9rem">${esc(name)}</div>
+          <div style="font-size:.75rem;color:var(--fg3)">vote แล้ว ${cnt} วัน</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="color:var(--busy);border-color:var(--busy-bd);white-space:nowrap"
+          onclick="clearVoter(${JSON.stringify(name)})">🗑️ ลบ vote</button>
+      </div>`).join('');
+  }
+  document.getElementById('modal-manage-voters').classList.remove('hidden');
+}
+
+async function clearVoter(name) {
+  if (!confirm(`ลบ vote ทั้งหมดของ "${name}" ออก?`)) return;
+  const responses = currentResponses || {};
+  const key = safeKey(name);
+  if (db) {
+    const updates = {};
+    for (const ds in responses) {
+      if (responses[ds][key] && responses[ds][key].name === name) {
+        updates[`trips/${currentId}/responses/${ds}/${key}`] = null;
+      }
+    }
+    await db.ref().update(updates);
+  } else {
+    for (const ds in responses) {
+      if ((localData[currentId]?.responses[ds]||{})[key]?.name === name) {
+        delete localData[currentId].responses[ds][key];
+      }
+    }
+  }
+  toast(`ลบ vote ของ "${name}" แล้ว`);
+  closeModal('modal-manage-voters');
 }
 
 function openDeleteModal() {
