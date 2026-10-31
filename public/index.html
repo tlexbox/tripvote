@@ -1115,7 +1115,7 @@ function openManageVoters() {
           <div style="font-size:.75rem;color:var(--fg3)">vote แล้ว ${cnt} วัน</div>
         </div>
         <button class="btn btn-ghost btn-sm" style="color:var(--busy);border-color:var(--busy-bd);white-space:nowrap"
-          onclick="clearVoter(${JSON.stringify(name)})">🗑️ ลบ vote</button>
+          data-voter-name="${esc(name)}" onclick="clearVoter(this.dataset.voterName)">🗑️ ลบ vote</button>
       </div>`).join('');
   }
   document.getElementById('modal-manage-voters').classList.remove('hidden');
