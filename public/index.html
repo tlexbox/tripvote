@@ -857,8 +857,8 @@ function renderSummary(dates, responses) {
 
   // Sort by busyCount asc, then freeN desc (fewest not-free first)
   const sorted = [...stats].sort((a, b) => {
-    const aBusy = allVoterNames.length - a.freeNames.length;
-    const bBusy = allVoterNames.length - b.freeNames.length;
+    const aBusy = allVoterNamesArr.length - a.freeNames.length;
+    const bBusy = allVoterNamesArr.length - b.freeNames.length;
     return aBusy - bBusy || b.freeNames.length - a.freeNames.length;
   });
 
