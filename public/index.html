@@ -408,8 +408,12 @@ input:focus { border-color: var(--accent); }
 .summary-title {
   font-family: var(--font-h); font-size: .9rem; font-weight: 700;
   color: var(--fg2); text-transform: uppercase; letter-spacing: .06em;
-  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  margin-bottom: 0; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; user-select: none;
 }
+.summary-title .sum-chevron { margin-left: auto; transition: transform .25s; font-style: normal; }
+.summary-body { overflow: hidden; transition: max-height .3s ease; max-height: 0; }
+.summary-body.open { max-height: 2000px; margin-top: 14px; }
 .summary-empty { font-size: .85rem; color: var(--fg3); font-style: italic; }
 
 .sum-row {
@@ -549,6 +553,7 @@ input:focus { border-color: var(--accent); }
         <button class="btn btn-ghost btn-sm" onclick="copyLink()">🔗 แชร์ลิงก์</button>
         <button class="btn btn-ghost btn-sm" id="btn-edit-trip" onclick="openEditModal()" hidden>✏️ แก้ไข</button>
         <button class="btn btn-ghost btn-sm" id="btn-manage-voters" onclick="openManageVoters()" hidden>👥 จัดการ</button>
+        <button class="btn btn-ghost btn-sm" id="btn-manage-guest" onclick="openManageGuest()" hidden>👥 จัดการ</button>
         <button class="btn btn-ghost btn-sm" id="btn-delete-trip" onclick="openDeleteModal()" hidden style="color:var(--busy);border-color:var(--busy-bd)">🗑️ ลบ</button>
         <button class="btn btn-ghost btn-sm" onclick="goHome()">+ ทริปใหม่</button>
       </div>
@@ -612,9 +617,31 @@ input:focus { border-color: var(--accent); }
         <label class="day-pick" id="edit-lbl-wd"><input type="checkbox" id="edit-wd"> วันธรรมดาด้วย</label>
       </div>
     </div>
+    <div class="field">
+      <label class="label">🔑 Password สำหรับจัดการ Vote <span style="color:var(--fg3);font-weight:400">(ไม่บังคับ)</span></label>
+      <input type="text" id="edit-manage-pw" placeholder="ตั้ง password ให้คนอื่นใช้จัดการ vote ด้วยได้" />
+      <div style="font-size:.78rem;color:var(--fg3);margin-top:4px">ถ้าเว้นว่างไว้ จะไม่มีปุ่มจัดการให้คนอื่นกด</div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-edit')">ยกเลิก</button>
       <button class="btn btn-primary" style="width:auto" onclick="saveEdit()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage guest password modal -->
+<div class="modal-bg hidden" id="modal-manage-pw">
+  <div class="modal">
+    <div class="modal-title">🔑 ใส่ Password</div>
+    <p style="color:var(--fg2);font-size:.85rem;margin-bottom:14px">ใส่ password เพื่อเข้าจัดการผู้ Vote</p>
+    <div class="field">
+      <input type="password" id="inp-manage-pw" placeholder="Password..." autocomplete="off"
+        onkeydown="if(event.key==='Enter') checkManagePw()" />
+    </div>
+    <div id="manage-pw-err" style="color:var(--busy);font-size:.82rem;min-height:18px;margin-top:-6px;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-manage-pw')">ยกเลิก</button>
+      <button class="btn btn-primary" style="width:auto" onclick="checkManagePw()">✓ ยืนยัน</button>
     </div>
   </div>
 </div>
@@ -848,6 +875,9 @@ function renderTrip(data) {
   document.getElementById('btn-edit-trip').hidden = !isOwner;
   document.getElementById('btn-manage-voters').hidden = !isOwner;
   document.getElementById('btn-delete-trip').hidden = !isOwner;
+  // Show guest manage button only if trip has a managePassword set and user is NOT owner
+  const hasManagePw = !!(info.managePassword);
+  document.getElementById('btn-manage-guest').hidden = isOwner || !hasManagePw;
 
   const dates = buildDates(info);
   const grid = document.getElementById('tv-grid');
@@ -873,8 +903,10 @@ function renderSummary(dates, responses) {
 
   if (totalVoters === 0) {
     wrap.innerHTML = `<div class="summary-card">
-      <div class="summary-title">🗓 สรุปวันว่างร่วมกัน</div>
-      <div class="summary-empty">ยังไม่มีใครติ๊กเลย — แชร์ลิงก์ให้เพื่อนมาติ๊กก่อนนะ</div>
+      <div class="summary-title" onclick="toggleSummary(this)">
+        🗓 สรุปวันว่างร่วมกัน <em class="sum-chevron">▶</em>
+      </div>
+      <div class="summary-body"><div class="summary-empty">ยังไม่มีใครติ๊กเลย — แชร์ลิงก์ให้เพื่อนมาติ๊กก่อนนะ</div></div>
     </div>`;
     wrap.hidden = false;
     return;
@@ -902,7 +934,8 @@ function renderSummary(dates, responses) {
   });
 
   let html = `<div class="summary-card">`;
-  html += `<div class="summary-title">🗓 สรุปวันว่างร่วมกัน <span style="font-size:.75rem;font-weight:600;color:var(--fg3);text-transform:none;letter-spacing:0">(${totalVoters} คนตอบแล้ว)</span></div>`;
+  html += `<div class="summary-title" onclick="toggleSummary(this)">🗓 สรุปวันว่างร่วมกัน <span style="font-size:.75rem;font-weight:600;color:var(--fg3);text-transform:none;letter-spacing:0">(${totalVoters} คนตอบแล้ว)</span><em class="sum-chevron">▶</em></div>`;
+  html += `<div class="summary-body">`;
 
   for (const s of sorted) {
     const isAllFree = s.freeN === totalVoters && s.busyCount === 0;
@@ -926,9 +959,16 @@ function renderSummary(dates, responses) {
     if (isAllFree) html += `<div class="sum-star">ทุกคนว่าง!</div>`;
     html += `</div>`;
   }
-  html += `</div>`;
+  html += `</div></div>`;
   wrap.innerHTML = html;
   wrap.hidden = false;
+}
+
+function toggleSummary(titleEl) {
+  const body = titleEl.nextElementSibling;
+  const chevron = titleEl.querySelector('.sum-chevron');
+  const isOpen = body.classList.toggle('open');
+  chevron.style.transform = isOpen ? 'rotate(90deg)' : '';
 }
 
 function buildDates(info) {
@@ -1064,6 +1104,7 @@ function openEditModal() {
     const el = document.getElementById(`edit-${k}`);
     el.onchange = function() { document.getElementById(`edit-lbl-${k}`).classList.toggle('on', this.checked); };
   });
+  document.getElementById('edit-manage-pw').value = i.managePassword || '';
   document.getElementById('modal-edit').classList.remove('hidden');
 }
 
@@ -1080,7 +1121,10 @@ function saveEdit() {
   if (start > end)  return toast('วันเริ่มต้องมาก่อนวันสิ้นสุด');
   if (!incSat && !incSun && !incWd) return toast('เลือกวันที่อยากแสดงด้วย');
 
+  const managePassword = document.getElementById('edit-manage-pw').value.trim() || null;
   const updated = { ...currentInfo, name, start, end, incSat, incSun, incWd };
+  if (managePassword) updated.managePassword = managePassword;
+  else delete updated.managePassword;
   if (db) {
     db.ref(`trips/${currentId}/info`).set(updated)
       .then(() => { closeModal('modal-edit'); toast('บันทึกแล้ว ✓'); })
@@ -1093,6 +1137,23 @@ function saveEdit() {
   }
   // Update recent list
   saveRecent({ id: currentId, name, start, end });
+}
+
+function openManageGuest() {
+  // Non-owner: show password prompt first
+  document.getElementById('inp-manage-pw').value = '';
+  document.getElementById('manage-pw-err').textContent = '';
+  document.getElementById('modal-manage-pw').classList.remove('hidden');
+  setTimeout(() => document.getElementById('inp-manage-pw').focus(), 50);
+}
+
+function checkManagePw() {
+  const entered = document.getElementById('inp-manage-pw').value;
+  const correct = currentInfo.managePassword || '';
+  if (!entered) { document.getElementById('manage-pw-err').textContent = 'กรุณาใส่ password'; return; }
+  if (entered !== correct) { document.getElementById('manage-pw-err').textContent = 'Password ไม่ถูกต้อง'; return; }
+  closeModal('modal-manage-pw');
+  openManageVoters();
 }
 
 function openManageVoters() {
