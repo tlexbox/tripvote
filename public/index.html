@@ -460,6 +460,54 @@ input:focus { border-color: var(--accent); }
   animation: pulse 2s ease infinite;
 }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Room Management ── */
+.rooms-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+.rooms-header {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.rooms-title-text {
+  font-family: var(--font-h); font-size: .9rem; font-weight: 700;
+  color: var(--fg2); text-transform: uppercase; letter-spacing: .06em;
+}
+.rooms-confirmed-badge {
+  font-size: .78rem; color: var(--free); font-weight: 700;
+  padding: 3px 10px; border-radius: 99px;
+  background: var(--free-bg); border: 1px solid var(--free-bd);
+}
+.room-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface2); margin-bottom: 8px;
+}
+.room-name { font-weight: 700; font-size: .9rem; }
+.room-members { font-size: .78rem; color: var(--fg2); margin-top: 2px; }
+.rooms-stat {
+  font-size: .82rem; color: var(--fg2);
+  padding: 8px 12px; background: var(--surface2);
+  border-radius: var(--r-sm); border: 1px solid var(--border);
+  margin-bottom: 14px; line-height: 1.6;
+}
+.member-pick {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border); border-radius: var(--r-sm);
+  cursor: pointer; transition: border-color .12s, background .12s; user-select: none;
+  background: var(--surface2);
+}
+.member-pick:hover:not(.disabled) { border-color: var(--accent); }
+.member-pick.going { background: var(--free-bg); border-color: var(--free-bd); }
+.member-pick.busy { background: var(--busy-bg); border-color: var(--busy-bd); }
+.member-pick.selected { border-color: var(--accent) !important; background: var(--accent-bg) !important; }
+.member-pick.disabled { opacity: .45; cursor: not-allowed; }
 </style>
 
 <!-- Firebase Realtime Database -->
@@ -572,6 +620,7 @@ input:focus { border-color: var(--accent); }
       <button class="btn btn-ghost btn-sm" onclick="setMyName()">ตกลง</button>
     </div>
 
+    <div id="tv-rooms" hidden></div>
     <div id="tv-summary" hidden></div>
 
     <div class="legend">
@@ -668,6 +717,45 @@ input:focus { border-color: var(--accent); }
   </div>
 </div>
 
+<!-- Confirm date modal -->
+<div class="modal-bg hidden" id="modal-confirm-date">
+  <div class="modal">
+    <div class="modal-title">🗓 ยืนยันวันทริป</div>
+    <p style="color:var(--fg2);font-size:.85rem;margin-bottom:14px">เลือกวันที่จะออกเดินทาง เพื่อเริ่มจัดการห้องพักได้</p>
+    <div id="confirm-date-list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm-date')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room modal -->
+<div class="modal-bg hidden" id="modal-room">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title" id="room-modal-title">🛏 ขอห้อง</div>
+    <div style="font-size:.85rem;color:var(--fg2);margin-bottom:14px">ชื่อห้อง: <strong id="room-creator-name"></strong></div>
+
+    <div class="label" style="margin-bottom:8px">เลือกสมาชิก (เขียวไป / แดงไม่ไป)</div>
+    <div id="room-member-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:14px"></div>
+
+    <div class="label" style="margin-bottom:6px">เพิ่มคนนอกรายชื่อ</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="inp-extra-member" placeholder="ใส่ชื่อ..." style="flex:1"
+        onkeydown="if(event.key==='Enter') addExtraRoomMember()" />
+      <button class="btn btn-ghost btn-sm" onclick="addExtraRoomMember()">+ เพิ่ม</button>
+    </div>
+
+    <div id="room-selected-summary" style="font-size:.82rem;color:var(--fg3);padding:9px 12px;background:var(--surface2);border-radius:var(--r-sm);border:1px solid var(--border);margin-bottom:4px">
+      ยังไม่ได้เลือกสมาชิก
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-room')">ยกเลิก</button>
+      <button class="btn btn-primary" style="width:auto" onclick="saveRoom()">✓ ยืนยัน</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -699,6 +787,9 @@ let activeRef = null;
 let localData = {};    // fallback no-Firebase store
 let currentInfo = {}; // cached trip info for editing
 let currentResponses = {}; // cached responses for manage-voters
+let currentRooms = {};    // cached rooms for room management
+let editingRoomId = null;
+let roomModalSelectedMembers = new Set();
 
 // ── Thai date helpers ──
 const DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
@@ -861,8 +952,10 @@ function openTrip(id) {
 function renderTrip(data) {
   const info = data.info || {};
   const responses = data.responses || {};
+  const rooms = data.rooms || {};
   currentInfo = info;
   currentResponses = responses;
+  currentRooms = rooms;
 
   document.getElementById('tv-name').textContent = info.name || 'ทริปนี้';
   document.getElementById('tv-dates').textContent =
@@ -884,9 +977,11 @@ function renderTrip(data) {
   const grid = document.getElementById('tv-grid');
   if (!dates.length) {
     grid.innerHTML = '<div class="empty">ไม่มีวันที่ตรงกับเงื่อนไข</div>';
+    document.getElementById('tv-rooms').hidden = true;
     document.getElementById('tv-summary').hidden = true;
     return;
   }
+  renderRooms(dates, responses, rooms, isOwner);
   renderSummary(dates, responses);
   grid.innerHTML = dates.map(d => renderBlock(d, responses)).join('');
 }
@@ -1292,6 +1387,283 @@ function toast(msg) {
   el.classList.add('on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('on'), 2400);
+}
+
+// ── ROOM MANAGEMENT ──
+
+function renderRooms(dates, responses, rooms, isOwner) {
+  const wrap = document.getElementById('tv-rooms');
+  const confirmedDate = currentInfo.confirmedDate;
+
+  if (!confirmedDate && !isOwner) { wrap.hidden = true; return; }
+
+  // Collect all voters
+  const allVotersSet = new Set();
+  for (const ds in responses) {
+    for (const v of Object.values(responses[ds])) allVotersSet.add(v.name);
+  }
+
+  const roomEntries = Object.entries(rooms || {});
+
+  // Build assigned set
+  const assignedMembers = new Set();
+  for (const [, room] of roomEntries) {
+    for (const m of (room.members || [])) assignedMembers.add(m);
+  }
+
+  // Who's going on confirmed date (free or no-vote; not busy)
+  const confirmedResp = confirmedDate ? (responses[confirmedDate] || {}) : {};
+  const getVoterStatus = name => {
+    const r = Object.values(confirmedResp).find(v => v.name === name);
+    return r ? r.status : 'unknown';
+  };
+  const allVotersArr = [...allVotersSet];
+  const goingVoters = allVotersArr.filter(n => getVoterStatus(n) !== 'busy');
+  const withoutRoom = goingVoters.filter(n => !assignedMembers.has(n));
+  const totalTravelers = [...assignedMembers].length;
+
+  let html = `<div class="rooms-card">`;
+  html += `<div class="rooms-header">`;
+  html += `<span class="rooms-title-text">🏨 จัดการห้องพัก</span>`;
+  if (confirmedDate) {
+    const d = dateOf(confirmedDate);
+    html += ` <span class="rooms-confirmed-badge">📅 วัน${DOW[d.getDay()]} ${fmtDate(d)}</span>`;
+  }
+  if (isOwner) {
+    html += `<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:.75rem" onclick="openConfirmDateModal()">🗓 ${confirmedDate?'เปลี่ยนวัน':'ยืนยันวันทริป'}</button>`;
+  }
+  html += `</div>`;
+
+  if (!confirmedDate) {
+    html += `<div style="color:var(--fg3);font-size:.85rem;font-style:italic;padding:4px 0">Admin ต้องยืนยันวันทริปก่อน จึงจะเริ่มจองห้องได้</div></div>`;
+    wrap.innerHTML = html; wrap.hidden = false; return;
+  }
+
+  // Stats
+  html += `<div class="rooms-stat">`;
+  html += `🛏 <strong>${roomEntries.length}</strong> ห้อง &nbsp;·&nbsp; 👤 <strong>${totalTravelers}</strong> คน`;
+  if (withoutRoom.length > 0) {
+    html += ` &nbsp;·&nbsp; <span style="color:var(--busy)">ยังไม่มีห้อง ${withoutRoom.length} คน: ${withoutRoom.map(n=>esc(n)).join(', ')}</span>`;
+  } else if (goingVoters.length > 0) {
+    html += ` &nbsp;·&nbsp; <span style="color:var(--free)">✓ ทุกคนมีห้องแล้ว</span>`;
+  }
+  html += `</div>`;
+
+  // Room list
+  for (const [rid, room] of roomEntries) {
+    const canEdit = isOwner || myName === room.creatorName;
+    html += `<div class="room-item">`;
+    html += `<div style="font-size:1.2rem;flex-shrink:0">🛏</div>`;
+    html += `<div style="flex:1;min-width:0">`;
+    html += `<div class="room-name">ห้อง ${esc(room.creatorName)}</div>`;
+    const mc = (room.members||[]).length;
+    html += `<div class="room-members">${mc} คน: ${(room.members||[]).map(m=>esc(m)).join(', ')||'—'}</div>`;
+    html += `</div>`;
+    if (canEdit) html += `<button class="btn btn-ghost btn-sm" data-rid="${rid}" onclick="openRoomModal(this.dataset.rid)">✏️ แก้ไข</button>`;
+    if (isOwner) html += `<button class="btn btn-ghost btn-sm" style="color:var(--busy);border-color:var(--busy-bd)" data-rid="${rid}" onclick="deleteRoom(this.dataset.rid)">🗑️</button>`;
+    html += `</div>`;
+  }
+
+  if (roomEntries.length === 0) {
+    html += `<div style="color:var(--fg3);font-size:.85rem;font-style:italic;margin-bottom:12px;padding:4px 0">ยังไม่มีใครขอห้อง — กดปุ่มด้านล่างเพื่อขอห้องแรก</div>`;
+  }
+
+  // Show "+ ขอห้อง" if myName set and not already room creator
+  const myExistingRoom = roomEntries.find(([,room]) => room.creatorName === myName);
+  if (myName && !myExistingRoom) {
+    html += `<button class="btn btn-ghost btn-sm" style="margin-top:${roomEntries.length?'8':'0'}px" onclick="openRoomModal(null)">🛏 + ขอห้อง</button>`;
+  } else if (!myName) {
+    html += `<div style="color:var(--fg3);font-size:.82rem;font-style:italic;margin-top:8px">ใส่ชื่อของคุณด้านบนเพื่อขอห้องได้</div>`;
+  }
+
+  html += `</div>`;
+  wrap.innerHTML = html;
+  wrap.hidden = false;
+}
+
+function openConfirmDateModal() {
+  const info = currentInfo;
+  const dates = buildDates(info);
+  const list = document.getElementById('confirm-date-list');
+  list.innerHTML = dates.map(d => {
+    const ds = iso(d);
+    const isSel = ds === info.confirmedDate;
+    const dayResp = currentResponses[ds] || {};
+    const freeN = Object.values(dayResp).filter(r => r.status === 'free').length;
+    return `<div class="sum-row${isSel?' all-free':''}" style="cursor:pointer" data-ds="${ds}" onclick="selectConfirmDate(this.dataset.ds)">
+      <div class="sum-date">${d.getDate()}</div>
+      <div class="sum-dow">วัน${DOW[d.getDay()]}<br><span style="font-size:.72rem;color:var(--fg3)">${MON[d.getMonth()]} ${d.getFullYear()+543}</span></div>
+      <div style="flex:1"></div>
+      ${freeN>0?`<div class="count-pill pill-free">✓ ${freeN}</div>`:''}
+      ${isSel?'<div class="sum-star">✓ เลือกอยู่</div>':''}
+    </div>`;
+  }).join('');
+  document.getElementById('modal-confirm-date').classList.remove('hidden');
+}
+
+function selectConfirmDate(ds) {
+  if (!currentId) return;
+  const updated = { ...currentInfo, confirmedDate: ds };
+  if (db) {
+    db.ref(`trips/${currentId}/info`).set(updated)
+      .then(() => { closeModal('modal-confirm-date'); toast('ยืนยันวันแล้ว ✓'); })
+      .catch(() => toast('เกิดข้อผิดพลาด'));
+  } else {
+    if (localData[currentId]) { localData[currentId].info = updated; renderTrip(localData[currentId]); }
+    closeModal('modal-confirm-date');
+    toast('ยืนยันวันแล้ว ✓');
+  }
+}
+
+function openRoomModal(roomId) {
+  editingRoomId = roomId;
+  roomModalSelectedMembers = new Set();
+
+  let creatorName = myName;
+  if (roomId && currentRooms[roomId]) {
+    const room = currentRooms[roomId];
+    creatorName = room.creatorName;
+    roomModalSelectedMembers = new Set(room.members || []);
+  }
+
+  document.getElementById('room-modal-title').textContent = roomId ? `✏️ แก้ไขห้อง ${creatorName}` : '🛏 ขอห้อง';
+  document.getElementById('room-creator-name').textContent = creatorName;
+  document.getElementById('inp-extra-member').value = '';
+  renderRoomMemberPicker();
+  document.getElementById('modal-room').classList.remove('hidden');
+}
+
+function renderRoomMemberPicker() {
+  const confirmedDate = currentInfo.confirmedDate;
+  const responses = currentResponses;
+  const rooms = currentRooms;
+
+  // All people: from responses + rooms + current selection
+  const allPeople = new Set();
+  for (const ds in responses) {
+    for (const v of Object.values(responses[ds])) allPeople.add(v.name);
+  }
+  for (const [, room] of Object.entries(rooms||{})) {
+    for (const m of (room.members||[])) allPeople.add(m);
+  }
+  for (const name of roomModalSelectedMembers) allPeople.add(name);
+
+  // Status on confirmed date
+  const confirmedResp = confirmedDate ? (responses[confirmedDate]||{}) : {};
+  const getStatus = name => {
+    const r = Object.values(confirmedResp).find(v => v.name === name);
+    return r ? r.status : 'unknown';
+  };
+
+  // Members in OTHER rooms (locked)
+  const assignedElsewhere = new Set();
+  for (const [rid, room] of Object.entries(rooms||{})) {
+    if (rid === editingRoomId) continue;
+    for (const m of (room.members||[])) assignedElsewhere.add(m);
+  }
+
+  const peopleArr = [...allPeople];
+  const wrap = document.getElementById('room-member-list');
+
+  if (peopleArr.length === 0) {
+    wrap.innerHTML = `<div style="color:var(--fg3);font-size:.85rem;text-align:center;padding:16px">ยังไม่มีรายชื่อผู้โหวด</div>`;
+    updateRoomSelectedSummary(); return;
+  }
+
+  wrap.innerHTML = peopleArr.map(name => {
+    const status = getStatus(name);
+    const isDisabled = assignedElsewhere.has(name);
+    const isSelected = roomModalSelectedMembers.has(name);
+    let cls = 'member-pick';
+    let badge = '';
+    if (status === 'free') {
+      cls += ' going';
+      badge = `<span style="color:var(--free);font-size:.75rem;font-weight:700;white-space:nowrap">ไป ✓</span>`;
+    } else if (status === 'busy') {
+      cls += ' busy';
+      badge = `<span style="color:var(--busy);font-size:.75rem;font-weight:700;white-space:nowrap">ไม่ไป ✗</span>`;
+    } else {
+      badge = `<span style="color:var(--fg3);font-size:.75rem;white-space:nowrap">ไม่แน่</span>`;
+    }
+    if (isSelected) cls += ' selected';
+    if (isDisabled) cls += ' disabled';
+    const checkmark = isSelected && !isDisabled ? `<span style="color:var(--accent);font-weight:800;flex-shrink:0">✓</span>` : '';
+    const takenLabel = isDisabled ? `<span style="font-size:.72rem;color:var(--fg3);flex-shrink:0;white-space:nowrap">มีห้องแล้ว</span>` : '';
+    return `<div class="${cls}"${isDisabled?'':` data-mname="${esc(name)}" onclick="toggleRoomMember(this.dataset.mname)"`}>
+      <div style="flex:1;font-weight:700;font-size:.88rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</div>
+      ${badge}${takenLabel}${checkmark}
+    </div>`;
+  }).join('');
+
+  updateRoomSelectedSummary();
+}
+
+function toggleRoomMember(name) {
+  if (roomModalSelectedMembers.has(name)) roomModalSelectedMembers.delete(name);
+  else roomModalSelectedMembers.add(name);
+  renderRoomMemberPicker();
+}
+
+function addExtraRoomMember() {
+  const inp = document.getElementById('inp-extra-member');
+  const name = inp.value.trim();
+  if (!name) return;
+  roomModalSelectedMembers.add(name);
+  inp.value = '';
+  renderRoomMemberPicker();
+  toast(`เพิ่ม ${name} แล้ว`);
+}
+
+function updateRoomSelectedSummary() {
+  const sel = [...roomModalSelectedMembers];
+  const wrap = document.getElementById('room-selected-summary');
+  if (sel.length === 0) {
+    wrap.innerHTML = 'ยังไม่ได้เลือกสมาชิก';
+    wrap.style.color = 'var(--fg3)';
+  } else {
+    wrap.innerHTML = `<strong>${sel.length} คน:</strong> ${sel.map(n=>esc(n)).join(', ')}`;
+    wrap.style.color = 'var(--fg)';
+  }
+}
+
+async function saveRoom() {
+  const confirmedDate = currentInfo.confirmedDate;
+  if (!confirmedDate) return toast('ยังไม่ได้ยืนยันวันทริป');
+  const isEditing = !!editingRoomId;
+  let creatorName = myName;
+  if (isEditing && currentRooms[editingRoomId]) creatorName = currentRooms[editingRoomId].creatorName;
+  if (!creatorName) return toast('ใส่ชื่อของคุณก่อนนะ');
+  const roomData = {
+    creatorName,
+    members: [...roomModalSelectedMembers],
+    createdAt: isEditing ? (currentRooms[editingRoomId]?.createdAt || Date.now()) : Date.now()
+  };
+  const roomId = editingRoomId || genId();
+  if (db) {
+    try {
+      await db.ref(`trips/${currentId}/rooms/${roomId}`).set(roomData);
+      closeModal('modal-room');
+      toast(isEditing ? 'แก้ไขห้องแล้ว ✓' : 'ขอห้องแล้ว ✓');
+    } catch(e) { toast('เกิดข้อผิดพลาด'); }
+  } else {
+    if (!localData[currentId]) return;
+    if (!localData[currentId].rooms) localData[currentId].rooms = {};
+    localData[currentId].rooms[roomId] = roomData;
+    closeModal('modal-room');
+    toast(isEditing ? 'แก้ไขห้องแล้ว ✓' : 'ขอห้องแล้ว ✓');
+    renderTrip(localData[currentId]);
+  }
+}
+
+async function deleteRoom(roomId) {
+  if (!confirm('ลบห้องนี้?')) return;
+  if (db) {
+    try { await db.ref(`trips/${currentId}/rooms/${roomId}`).remove(); toast('ลบห้องแล้ว'); }
+    catch(e) { toast('เกิดข้อผิดพลาด'); }
+  } else {
+    if (localData[currentId]?.rooms) { delete localData[currentId].rooms[roomId]; renderTrip(localData[currentId]); }
+    toast('ลบห้องแล้ว');
+  }
 }
 
 // ── Boot ──
