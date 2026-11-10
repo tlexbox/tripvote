@@ -1465,13 +1465,17 @@ function renderRooms(dates, responses, rooms, isOwner) {
   }
   html += `</div>`;
 
-  // Room list
-  for (const [rid, room] of roomEntries) {
+  // Room list (sort by createdAt, label duplicate creator rooms as "request แทน")
+  const sortedRooms = [...roomEntries].sort((a,b) => (a[1].createdAt||0)-(b[1].createdAt||0));
+  const creatorSeen = {};
+  for (const [rid, room] of sortedRooms) {
+    creatorSeen[room.creatorName] = (creatorSeen[room.creatorName]||0) + 1;
+    const isProxy = creatorSeen[room.creatorName] > 1;
     const canEdit = isOwner || myName === room.creatorName;
     html += `<div class="room-item">`;
     html += `<div style="font-size:1.2rem;flex-shrink:0">🛏</div>`;
     html += `<div style="flex:1;min-width:0">`;
-    html += `<div class="room-name">ห้อง ${esc(room.creatorName)}</div>`;
+    html += `<div class="room-name">ห้อง ${esc(room.creatorName)}${isProxy?' <span style="font-size:.72rem;color:var(--fg3);font-weight:400">(request แทน)</span>':''}</div>`;
     const mc = (room.members||[]).length;
     html += `<div class="room-members">${mc} คน: ${(room.members||[]).map(m=>esc(m)).join(', ')||'—'}</div>`;
     html += `</div>`;
@@ -1484,11 +1488,10 @@ function renderRooms(dates, responses, rooms, isOwner) {
     html += `<div style="color:var(--fg3);font-size:.85rem;font-style:italic;margin-bottom:12px;padding:4px 0">ยังไม่มีใครขอห้อง — กดปุ่มด้านล่างเพื่อขอห้องแรก</div>`;
   }
 
-  // Show "+ ขอห้อง" if myName set and not already room creator
-  const myExistingRoom = roomEntries.find(([,room]) => room.creatorName === myName);
-  if (myName && !myExistingRoom) {
+  // Show "+ ขอห้อง" button always when myName is set
+  if (myName) {
     html += `<button class="btn btn-ghost btn-sm" style="margin-top:${roomEntries.length?'8':'0'}px" onclick="openRoomModal(null)">🛏 + ขอห้อง</button>`;
-  } else if (!myName) {
+  } else {
     html += `<div style="color:var(--fg3);font-size:.82rem;font-style:italic;margin-top:8px">ใส่ชื่อของคุณด้านบนเพื่อขอห้องได้</div>`;
   }
 
@@ -1542,7 +1545,10 @@ function openRoomModal(roomId) {
     roomModalSelectedMembers = new Set(room.members || []);
   }
 
-  document.getElementById('room-modal-title').textContent = roomId ? `✏️ แก้ไขห้อง ${creatorName}` : '🛏 ขอห้อง';
+  const myRoomCount = Object.values(currentRooms).filter(r => r.creatorName === myName).length;
+  document.getElementById('room-modal-title').textContent = roomId
+    ? `✏️ แก้ไขห้อง ${creatorName}`
+    : myRoomCount > 0 ? '🛏 ขอห้อง (request แทน)' : '🛏 ขอห้อง';
   document.getElementById('room-creator-name').textContent = creatorName;
   document.getElementById('inp-extra-member').value = '';
   renderRoomMemberPicker();
