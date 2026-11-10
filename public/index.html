@@ -1100,13 +1100,14 @@ function renderBlock(d, responses) {
     for (const v of Object.values(responses[dss])) allVoters.add(v.name);
   }
 
-  let freeN=0, busyN=0;
+  let freeN=0, busyN=0, maybeN=0;
   const explicitSet = new Set();
   let chips = '';
   for (const r of Object.values(dayResp)) {
     explicitSet.add(r.name);
     if (r.status==='free') freeN++;
     if (r.status==='busy') busyN++;
+    if (r.status==='maybe') maybeN++;
     const cls = r.status==='free'?'chip-free':r.status==='busy'?'chip-busy':'chip-maybe';
     const ic  = r.status==='free'?'✓':r.status==='busy'?'✗':'?';
     chips += `<div class="chip ${cls}">${ic} ${esc(r.name)}</div>`;
@@ -1139,6 +1140,7 @@ function renderBlock(d, responses) {
       </div>
       <div class="count-badges">
         <div class="count-pill pill-free">✓ ${freeN}</div>
+        ${maybeN>0?`<div class="count-pill pill-maybe">? ${maybeN}</div>`:''}
         <div class="count-pill pill-busy">✗ ${busyN}</div>
       </div>
     </div>
