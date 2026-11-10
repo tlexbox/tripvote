@@ -1094,14 +1094,30 @@ function buildDates(info) {
 function renderBlock(d, responses) {
   const ds = iso(d);
   const dayResp = responses[ds] || {};
+  // Collect all voters across all dates (for implicit-free rule)
+  const allVoters = new Set();
+  for (const dss in responses) {
+    for (const v of Object.values(responses[dss])) allVoters.add(v.name);
+  }
+
   let freeN=0, busyN=0;
-  const chips = Object.values(dayResp).map(r => {
+  const explicitSet = new Set();
+  let chips = '';
+  for (const r of Object.values(dayResp)) {
+    explicitSet.add(r.name);
     if (r.status==='free') freeN++;
     if (r.status==='busy') busyN++;
     const cls = r.status==='free'?'chip-free':r.status==='busy'?'chip-busy':'chip-maybe';
     const ic  = r.status==='free'?'✓':r.status==='busy'?'✗':'?';
-    return `<div class="chip ${cls}">${ic} ${esc(r.name)}</div>`;
-  }).join('');
+    chips += `<div class="chip ${cls}">${ic} ${esc(r.name)}</div>`;
+  }
+  // Implicit free: voted other dates but not this one → assumed free
+  for (const name of allVoters) {
+    if (!explicitSet.has(name)) {
+      freeN++;
+      chips += `<div class="chip chip-free" style="opacity:.55" title="ไม่ได้ติ๊กวันนี้ ถือว่าว่าง">✓ ${esc(name)}</div>`;
+    }
+  }
 
   const myKey = myName ? safeKey(myName) : '';
   const myStatus = myKey && dayResp[myKey] ? dayResp[myKey].status : '';
@@ -1426,8 +1442,8 @@ function renderRooms(dates, responses, rooms, isOwner) {
   html += `<div class="rooms-header">`;
   html += `<span class="rooms-title-text">🏨 จัดการห้องพัก</span>`;
   if (confirmedDate) {
-    const d = dateOf(confirmedDate);
-    html += ` <span class="rooms-confirmed-badge">📅 วัน${DOW[d.getDay()]} ${fmtDate(d)}</span>`;
+    const cd = dates.find(d => iso(d) === confirmedDate);
+    if (cd) html += ` <span class="rooms-confirmed-badge">📅 วัน${DOW[cd.getDay()]} ${fmtDate(cd)}</span>`;
   }
   if (isOwner) {
     html += `<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:.75rem" onclick="openConfirmDateModal()">🗓 ${confirmedDate?'เปลี่ยนวัน':'ยืนยันวันทริป'}</button>`;
@@ -1576,14 +1592,16 @@ function renderRoomMemberPicker() {
     const isSelected = roomModalSelectedMembers.has(name);
     let cls = 'member-pick';
     let badge = '';
-    if (status === 'free') {
+    if (status === 'free' || status === 'unknown') {
       cls += ' going';
-      badge = `<span style="color:var(--free);font-size:.75rem;font-weight:700;white-space:nowrap">ไป ✓</span>`;
+      badge = status === 'free'
+        ? `<span style="color:var(--free);font-size:.75rem;font-weight:700;white-space:nowrap">ไป ✓</span>`
+        : `<span style="color:var(--free);font-size:.72rem;opacity:.7;white-space:nowrap">ไป (default)</span>`;
     } else if (status === 'busy') {
       cls += ' busy';
       badge = `<span style="color:var(--busy);font-size:.75rem;font-weight:700;white-space:nowrap">ไม่ไป ✗</span>`;
     } else {
-      badge = `<span style="color:var(--fg3);font-size:.75rem;white-space:nowrap">ไม่แน่</span>`;
+      badge = `<span style="color:var(--maybe);font-size:.75rem;white-space:nowrap">ไม่แน่ ?</span>`;
     }
     if (isSelected) cls += ' selected';
     if (isDisabled) cls += ' disabled';
