@@ -638,6 +638,7 @@ input:focus { border-color: var(--accent); }
         <button class="btn btn-ghost btn-sm" id="btn-edit-trip" onclick="openEditModal()" hidden>✏️ แก้ไข</button>
         <button class="btn btn-ghost btn-sm" id="btn-manage-voters" onclick="onManageClick()" hidden>👥 จัดการ</button>
         <button class="btn btn-ghost btn-sm" id="btn-delete-trip" onclick="openDeleteModal()" hidden style="color:var(--busy);border-color:var(--busy-bd)">🗑️ ลบ</button>
+        <button class="btn btn-ghost btn-sm" id="btn-exit-admin" onclick="exitGuestAdmin()" hidden style="color:var(--busy);border-color:var(--busy-bd)">🔓 ออกจาก Admin</button>
         <button class="btn btn-ghost btn-sm" onclick="goHome()">+ ทริปใหม่</button>
       </div>
     </div>
@@ -889,6 +890,8 @@ let currentResponses = {}; // cached responses for manage-voters
 let currentRooms = {};    // cached rooms for room management
 let editingRoomId = null;
 let roomModalSelectedMembers = new Set();
+let guestAdmin = false; // elevated via manage-password (non-owner)
+let lastSnapData = null; // cached Firebase snapshot for re-render
 
 // ── Thai date helpers ──
 const DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
@@ -1025,6 +1028,7 @@ function openTrip(id) {
   } catch(e) {}
 
   if (activeRef) { activeRef.off(); activeRef = null; }
+  guestAdmin = false; // reset elevated access when switching trips
 
   if (db) {
     activeRef = db.ref(`trips/${id}`);
@@ -1051,6 +1055,7 @@ function openTrip(id) {
 
 // ── RENDER ──
 function renderTrip(data) {
+  if (data) lastSnapData = data;
   const info = data.info || {};
   const responses = data.responses || {};
   const rooms = data.rooms || {};
@@ -1062,9 +1067,10 @@ function renderTrip(data) {
   document.getElementById('tv-dates').textContent =
     `📅 ${fmtDate(dateOf(info.start))} → ${fmtDate(dateOf(info.end))}`;
 
-  // Show owner controls if token matches
+  // Show owner controls if token matches OR guest elevated via password
   const storedToken = (() => { try { return localStorage.getItem(`tv_own_${currentId}`); } catch(e) { return null; } })();
-  const isOwner = storedToken && info.ownerToken && storedToken === info.ownerToken;
+  const isRealOwner = !!(storedToken && info.ownerToken && storedToken === info.ownerToken);
+  const isOwner = isRealOwner || guestAdmin;
   document.getElementById('btn-edit-trip').hidden = !isOwner;
   document.getElementById('btn-delete-trip').hidden = !isOwner;
   // Show manage button to owner always, or to guest if managePassword is set
@@ -1073,6 +1079,9 @@ function renderTrip(data) {
   const btnManage = document.getElementById('btn-manage-voters');
   btnManage.hidden = !showManage;
   btnManage._isOwner = isOwner;
+  // Show exit-admin button only when guest is elevated (not real owner)
+  const btnExitAdmin = document.getElementById('btn-exit-admin');
+  if (btnExitAdmin) btnExitAdmin.hidden = !(guestAdmin && !isRealOwner);
 
   const dates = buildDates(info);
   const grid = document.getElementById('tv-grid');
@@ -1383,7 +1392,16 @@ function checkManagePw() {
   if (!entered) { document.getElementById('manage-pw-err').textContent = 'กรุณาใส่ password'; return; }
   if (entered !== correct) { document.getElementById('manage-pw-err').textContent = 'Password ไม่ถูกต้อง'; return; }
   closeModal('modal-manage-pw');
-  openManageVoters();
+  guestAdmin = true;
+  // Re-render with elevated privileges
+  renderTrip(lastSnapData);
+  toast('เข้าสู่โหมด Admin แล้ว');
+}
+
+function exitGuestAdmin() {
+  guestAdmin = false;
+  renderTrip(lastSnapData);
+  toast('ออกจากโหมด Admin แล้ว');
 }
 
 function openManageVoters() {
