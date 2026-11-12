@@ -1036,6 +1036,8 @@ function openTrip(id) {
         document.getElementById('tv-grid').innerHTML = '<div class="empty">ไม่พบทริปนี้</div>';
         return;
       }
+      // Save to recent so this device can find the trip from home page next time
+      if (data.info) saveRecent({ id, name: data.info.name||'ทริป', start: data.info.start||'', end: data.info.end||'' });
       renderTrip(data);
     });
   } else {
@@ -1548,6 +1550,7 @@ function renderRooms(dates, responses, rooms, isOwner) {
   }
   if (isOwner) {
     html += `<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:.75rem" onclick="openConfirmDateModal()">🗓 ${confirmedDate?'เปลี่ยนวัน':'ยืนยันวันทริป'}</button>`;
+    if (roomEntries.length > 0) html += `<button class="btn btn-ghost btn-sm" style="font-size:.75rem" onclick="toggleBulkPrice(this)">💲 กำหนดราคา</button>`;
   }
   html += `</div>`;
 
@@ -1565,6 +1568,31 @@ function renderRooms(dates, responses, rooms, isOwner) {
     html += ` &nbsp;·&nbsp; <span style="color:var(--free)">✓ ทุกคนมีห้องแล้ว</span>`;
   }
   html += `</div>`;
+
+  // Admin bulk price panel
+  if (isOwner && roomEntries.length > 0) {
+    html += `<div id="bulk-price-panel" style="display:none;padding:12px 14px;background:var(--accent-bg);border:1px solid var(--accent);border-radius:var(--r-sm);margin-bottom:12px">`;
+    html += `<div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:10px">&#x1F4B2; กำหนดราคาห้องพัก</div>`;
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">`;
+    html += `<span style="font-size:.8rem;color:var(--fg2);white-space:nowrap">ทุกห้องราคาเดียวกัน:</span>`;
+    html += `<input type="number" id="inp-bulk-price-all" placeholder="บาท" min="0" style="width:110px;padding:5px 8px;font-size:.85rem" oninput="previewBulkPrice(this.value)" />`;
+    html += `<button class="btn btn-ghost btn-sm" onclick="applyAllSamePrice()">✓ ใช้ทุกห้อง</button>`;
+    html += `</div>`;
+    const sr2 = [...roomEntries].sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
+    const cs2 = {};
+    for (const [rid, room] of sr2) {
+      cs2[room.creatorName] = (cs2[room.creatorName]||0)+1;
+      const lbl = `ห้อง ${esc(room.creatorName)}${cs2[room.creatorName]>1?' (request แทน)':''}`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">`;
+      html += `<span style="flex:1;font-size:.82rem">${lbl}</span>`;
+      html += `<input type="number" id="inp-price-${rid}" data-rid="${rid}" placeholder="บาท" min="0" value="${room.price||''}" style="width:110px;padding:5px 8px;font-size:.85rem" oninput="updateBulkTotal()" />`;
+      html += `</div>`;
+    }
+    html += `<div id="bulk-price-total" style="margin-top:6px;font-size:.82rem;font-weight:700;color:var(--accent);text-align:right"></div>`;
+    html += `<div style="display:flex;justify-content:flex-end;margin-top:8px">`;
+    html += `<button class="btn btn-primary btn-sm" style="width:auto" onclick="saveAllRoomPrices()">&#x1F4BE; บันทึกทุกห้อง</button>`;
+    html += `</div></div>`;
+  }
 
   // Payment summary stats
   let totalPrice = 0, totalPaid = 0;
@@ -2045,6 +2073,62 @@ try {
     document.querySelectorAll('#btn-theme').forEach(b => b.textContent = saved === 'dark' ? '☀️' : '🌙');
   }
 } catch(e) {}
+
+// ── Bulk Price ──
+function toggleBulkPrice(btn) {
+  const panel = document.getElementById('bulk-price-panel');
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  btn.classList.toggle('btn-active', !isOpen);
+  if (!isOpen) updateBulkTotal();
+}
+
+function previewBulkPrice(val) {
+  const v = parseFloat(val) || 0;
+  document.querySelectorAll('#bulk-price-panel input[type=number][id^=inp-price-]').forEach(inp => {
+    inp.value = v > 0 ? v : '';
+  });
+  updateBulkTotal();
+}
+
+function applyAllSamePrice() {
+  const v = parseFloat(document.getElementById('inp-bulk-price-all')?.value) || 0;
+  if (!v) return;
+  document.querySelectorAll('#bulk-price-panel input[type=number][id^=inp-price-]').forEach(inp => {
+    inp.value = v;
+  });
+  updateBulkTotal();
+}
+
+function updateBulkTotal() {
+  let total = 0;
+  document.querySelectorAll('#bulk-price-panel input[type=number][id^=inp-price-]').forEach(inp => {
+    total += parseFloat(inp.value) || 0;
+  });
+  const el = document.getElementById('bulk-price-total');
+  if (el) el.textContent = total > 0 ? `รวมทั้งหมด: ${total.toLocaleString()} บาท` : '';
+}
+
+async function saveAllRoomPrices() {
+  if (!activeRef) return;
+  const inputs = document.querySelectorAll('#bulk-price-panel input[type=number][id^=inp-price-]');
+  const updates = {};
+  inputs.forEach(inp => {
+    const rid = inp.dataset.rid;
+    const val = parseFloat(inp.value) || 0;
+    if (rid) updates[`rooms/${rid}/price`] = val || null;
+  });
+  if (!Object.keys(updates).length) return;
+  try {
+    await activeRef.update(updates);
+    const btn = document.querySelector('[onclick="toggleBulkPrice(this)"]');
+    toggleBulkPrice(btn);
+    alert('บันทึกราคาเรียบร้อยแล้ว');
+  } catch(e) {
+    alert('เกิดข้อผิดพลาด: ' + e.message);
+  }
+}
 
 // ── Boot ──
 route();
