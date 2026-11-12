@@ -508,6 +508,41 @@ input:focus { border-color: var(--accent); }
 .member-pick.busy { background: var(--busy-bg); border-color: var(--busy-bd); }
 .member-pick.selected { border-color: var(--accent) !important; background: var(--accent-bg) !important; }
 .member-pick.disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Payment ── */
+.room-price-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 5px; font-size: .78rem;
+}
+.price-tag {
+  font-weight: 700; color: var(--accent);
+}
+.paid-tag { color: var(--free); font-weight: 600; }
+.remain-tag { color: var(--busy); font-weight: 600; }
+.remain-zero { color: var(--free); font-weight: 700; }
+.pay-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: .7rem; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+  border: 1px solid;
+}
+.pay-pill-none { color: var(--fg3); border-color: var(--border); background: var(--surface); }
+.pay-pill-part { color: var(--maybe); border-color: var(--maybe-bd); background: var(--maybe-bg); }
+.pay-pill-full { color: var(--free); border-color: var(--free-bd); background: var(--free-bg); }
+.slip-thumb {
+  width: 44px; height: 44px; object-fit: cover; border-radius: 6px;
+  border: 1px solid var(--border); cursor: pointer; flex-shrink: 0;
+}
+.payment-hist-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--surface2); margin-bottom: 6px;
+}
+.slip-preview-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.85);
+  z-index: 999; display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.slip-preview-bg img { max-width: 94vw; max-height: 90vh; border-radius: 10px; }
 </style>
 
 <!-- Firebase Realtime Database -->
@@ -727,6 +762,67 @@ input:focus { border-color: var(--accent); }
       <button class="btn btn-ghost" onclick="closeModal('modal-confirm-date')">ปิด</button>
     </div>
   </div>
+</div>
+
+<!-- Payment modal -->
+<div class="modal-bg hidden" id="modal-payment">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title" id="pay-modal-title">💰 จ่ายค่าห้อง</div>
+    <div style="font-size:.85rem;color:var(--fg2);margin-bottom:4px">ห้อง: <strong id="pay-room-label"></strong></div>
+
+    <!-- Price bar -->
+    <div id="pay-price-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:14px;font-size:.85rem">
+      <span>💰 ราคาห้อง: <strong id="pay-price-display">—</strong></span>
+      <span id="pay-paid-display" style="color:var(--free)"></span>
+      <span id="pay-remain-display" style="color:var(--busy)"></span>
+    </div>
+
+    <!-- Admin: set price -->
+    <div id="pay-set-price-row" class="hidden" style="margin-bottom:14px">
+      <div class="label" style="margin-bottom:6px">💲 กำหนดราคาห้อง (admin)</div>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="inp-room-price" placeholder="ราคาห้อง (บาท)" min="0" style="flex:1" />
+        <button class="btn btn-ghost btn-sm" onclick="saveRoomPrice()">✓ บันทึก</button>
+      </div>
+    </div>
+
+    <!-- Payment history -->
+    <div class="label" style="margin-bottom:8px">ประวัติการจ่ายเงิน</div>
+    <div id="pay-history" style="max-height:200px;overflow-y:auto;margin-bottom:14px">
+      <div style="color:var(--fg3);font-size:.83rem;text-align:center;padding:12px">ยังไม่มีการจ่ายเงิน</div>
+    </div>
+
+    <!-- Add new payment (room creator or owner) -->
+    <div id="pay-add-section">
+      <div class="label" style="margin-bottom:8px">+ เพิ่มการจ่ายเงิน</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <input type="number" id="inp-pay-amount" placeholder="จำนวนเงิน (บาท)" min="1" style="flex:1" />
+        <input type="text" id="inp-pay-note" placeholder="หมายเหตุ (เช่น มัดจำ)" style="flex:1" />
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <label class="btn btn-ghost btn-sm" for="inp-slip-file" style="cursor:pointer">📎 แนบสลิป</label>
+        <input type="file" id="inp-slip-file" accept="image/*" style="display:none" onchange="onSlipFileChange(this)" />
+        <span id="slip-file-name" style="font-size:.8rem;color:var(--fg3)">ยังไม่ได้แนบ</span>
+      </div>
+      <div id="slip-preview-wrap" class="hidden" style="margin:8px 0">
+        <img id="slip-preview-img" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="showSlipPreview(this.src)" />
+      </div>
+      <div class="modal-actions" style="margin-top:4px">
+        <button class="btn btn-ghost" onclick="closeModal('modal-payment')">ปิด</button>
+        <button class="btn btn-primary" style="width:auto" id="btn-save-payment" onclick="savePayment()">💰 บันทึกการจ่าย</button>
+      </div>
+    </div>
+    <div id="pay-no-add-section" class="hidden">
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-payment')">ปิด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slip full preview -->
+<div class="slip-preview-bg hidden" id="slip-full-preview" onclick="this.classList.add('hidden')">
+  <img id="slip-full-img" src="" alt="slip" />
 </div>
 
 <!-- Room modal -->
@@ -1467,6 +1563,40 @@ function renderRooms(dates, responses, rooms, isOwner) {
   }
   html += `</div>`;
 
+  // Payment summary stats
+  let totalPrice = 0, totalPaid = 0;
+  for (const [, room] of roomEntries) {
+    totalPrice += (room.price || 0);
+    for (const p of Object.values(room.payments || {})) totalPaid += (p.amount || 0);
+  }
+  if (totalPrice > 0) {
+    const totalRemain = totalPrice - totalPaid;
+    const paidRooms = roomEntries.filter(([,r]) => {
+      const paid = Object.values(r.payments||{}).reduce((s,p)=>s+(p.amount||0),0);
+      return r.price > 0 && paid >= r.price;
+    }).length;
+    const partRooms = roomEntries.filter(([,r]) => {
+      const paid = Object.values(r.payments||{}).reduce((s,p)=>s+(p.amount||0),0);
+      return r.price > 0 && paid > 0 && paid < r.price;
+    }).length;
+    const noneRooms = roomEntries.filter(([,r]) => {
+      const paid = Object.values(r.payments||{}).reduce((s,p)=>s+(p.amount||0),0);
+      return r.price > 0 && paid === 0;
+    }).length;
+    html += `<div style="padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:12px;font-size:.82rem;line-height:1.9">`;
+    html += `<div>💰 ค่าห้องรวม: <strong>฿${totalPrice.toLocaleString()}</strong>&nbsp;&nbsp;`;
+    html += `<span class="paid-tag">จ่ายแล้ว ฿${totalPaid.toLocaleString()}</span>&nbsp;&nbsp;`;
+    html += totalRemain > 0
+      ? `<span class="remain-tag">ค้าง ฿${totalRemain.toLocaleString()}</span>`
+      : `<span class="remain-zero">✓ ครบแล้ว</span>`;
+    html += `</div>`;
+    html += `<div style="color:var(--fg2)">`;
+    if (paidRooms) html += `<span class="pay-pill pay-pill-full">✓ ครบ ${paidRooms} ห้อง</span> `;
+    if (partRooms) html += `<span class="pay-pill pay-pill-part">◑ บางส่วน ${partRooms} ห้อง</span> `;
+    if (noneRooms) html += `<span class="pay-pill pay-pill-none">○ ยังไม่จ่าย ${noneRooms} ห้อง</span>`;
+    html += `</div></div>`;
+  }
+
   // Room list (sort by createdAt, label duplicate creator rooms as "request แทน")
   const sortedRooms = [...roomEntries].sort((a,b) => (a[1].createdAt||0)-(b[1].createdAt||0));
   const creatorSeen = {};
@@ -1474,15 +1604,40 @@ function renderRooms(dates, responses, rooms, isOwner) {
     creatorSeen[room.creatorName] = (creatorSeen[room.creatorName]||0) + 1;
     const isProxy = creatorSeen[room.creatorName] > 1;
     const canEdit = isOwner || myName === room.creatorName;
-    html += `<div class="room-item">`;
+    const canPay = isOwner || myName === room.creatorName;
+    // payment calc
+    const roomPaid = Object.values(room.payments||{}).reduce((s,p)=>s+(p.amount||0),0);
+    const roomRemain = (room.price||0) - roomPaid;
+    const payStatus = !room.price ? 'noprice' : roomPaid >= room.price ? 'full' : roomPaid > 0 ? 'part' : 'none';
+    html += `<div class="room-item" style="flex-wrap:wrap;gap:8px">`;
     html += `<div style="font-size:1.2rem;flex-shrink:0">🛏</div>`;
     html += `<div style="flex:1;min-width:0">`;
     html += `<div class="room-name">ห้อง ${esc(room.creatorName)}${isProxy?' <span style="font-size:.72rem;color:var(--fg3);font-weight:400">(request แทน)</span>':''}</div>`;
     const mc = (room.members||[]).length;
     html += `<div class="room-members">${mc} คน: ${(room.members||[]).map(m=>esc(m)).join(', ')||'—'}</div>`;
+    // price/payment row
+    if (room.price > 0 || isOwner) {
+      html += `<div class="room-price-row">`;
+      if (room.price > 0) {
+        html += `<span class="price-tag">฿${room.price.toLocaleString()}</span>`;
+        html += `<span class="paid-tag">จ่าย ฿${roomPaid.toLocaleString()}</span>`;
+        if (roomRemain > 0) html += `<span class="remain-tag">ค้าง ฿${roomRemain.toLocaleString()}</span>`;
+        else html += `<span class="remain-zero">✓ ครบ</span>`;
+        const pillCls = payStatus==='full'?'pay-pill-full':payStatus==='part'?'pay-pill-part':'pay-pill-none';
+        const pillTxt = payStatus==='full'?'ครบแล้ว':payStatus==='part'?'บางส่วน':'ยังไม่จ่าย';
+        html += `<span class="pay-pill ${pillCls}">${pillTxt}</span>`;
+      } else if (isOwner) {
+        html += `<span style="color:var(--fg3);font-size:.75rem">ยังไม่กำหนดราคา</span>`;
+      }
+      html += `</div>`;
+    }
     html += `</div>`;
-    if (canEdit) html += `<button class="btn btn-ghost btn-sm" data-rid="${rid}" onclick="openRoomModal(this.dataset.rid)">✏️ แก้ไข</button>`;
+    // action buttons
+    html += `<div style="display:flex;gap:6px;flex-shrink:0;align-items:center">`;
+    if (canPay) html += `<button class="btn btn-ghost btn-sm" data-rid="${rid}" onclick="openPaymentModal(this.dataset.rid)">💰 จ่ายเงิน</button>`;
+    if (canEdit) html += `<button class="btn btn-ghost btn-sm" data-rid="${rid}" onclick="openRoomModal(this.dataset.rid)">✏️</button>`;
     if (isOwner) html += `<button class="btn btn-ghost btn-sm" style="color:var(--busy);border-color:var(--busy-bd)" data-rid="${rid}" onclick="deleteRoom(this.dataset.rid)">🗑️</button>`;
+    html += `</div>`;
     html += `</div>`;
   }
 
@@ -1690,6 +1845,184 @@ async function deleteRoom(roomId) {
     if (localData[currentId]?.rooms) { delete localData[currentId].rooms[roomId]; renderTrip(localData[currentId]); }
     toast('ลบห้องแล้ว');
   }
+}
+
+// ── Payment ──
+let paymentRoomId = null;
+let slipDataUrl = null;
+
+function openPaymentModal(roomId) {
+  paymentRoomId = roomId;
+  slipDataUrl = null;
+  const room = currentRooms[roomId];
+  if (!room) return;
+
+  const isOwner = document.getElementById('btn-edit-trip') && !document.getElementById('btn-edit-trip').hidden;
+  const canAdd = isOwner || myName === room.creatorName;
+
+  // label
+  const creatorSeen = {};
+  const sorted = Object.entries(currentRooms).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
+  for (const [rid, r] of sorted) {
+    creatorSeen[r.creatorName] = (creatorSeen[r.creatorName]||0)+1;
+    if (rid === roomId) break;
+  }
+  const isProxy = creatorSeen[room.creatorName] > 1;
+  document.getElementById('pay-modal-title').textContent = canAdd ? '💰 จ่ายค่าห้อง' : '💰 ดูการจ่ายเงิน';
+  document.getElementById('pay-room-label').textContent = `ห้อง ${room.creatorName}${isProxy?' (request แทน)':''}`;
+
+  // price display
+  const payments = Object.values(room.payments||{});
+  const paid = payments.reduce((s,p)=>s+(p.amount||0),0);
+  const price = room.price || 0;
+  document.getElementById('pay-price-display').textContent = price > 0 ? `฿${price.toLocaleString()}` : 'ยังไม่กำหนด';
+  document.getElementById('pay-paid-display').textContent = paid > 0 ? `จ่ายแล้ว ฿${paid.toLocaleString()}` : '';
+  const remain = price - paid;
+  document.getElementById('pay-remain-display').textContent =
+    price > 0 ? (remain > 0 ? `ค้าง ฿${remain.toLocaleString()}` : '✓ ครบแล้ว') : '';
+
+  // admin: set price
+  const priceRow = document.getElementById('pay-set-price-row');
+  if (isOwner) {
+    priceRow.classList.remove('hidden');
+    document.getElementById('inp-room-price').value = price || '';
+  } else {
+    priceRow.classList.add('hidden');
+  }
+
+  // payment history
+  renderPaymentHistory(room);
+
+  // add section
+  document.getElementById('inp-pay-amount').value = '';
+  document.getElementById('inp-pay-note').value = '';
+  document.getElementById('inp-slip-file').value = '';
+  document.getElementById('slip-file-name').textContent = 'ยังไม่ได้แนบ';
+  document.getElementById('slip-preview-wrap').classList.add('hidden');
+  if (canAdd) {
+    document.getElementById('pay-add-section').classList.remove('hidden');
+    document.getElementById('pay-no-add-section').classList.add('hidden');
+  } else {
+    document.getElementById('pay-add-section').classList.add('hidden');
+    document.getElementById('pay-no-add-section').classList.remove('hidden');
+  }
+
+  document.getElementById('modal-payment').classList.remove('hidden');
+}
+
+function renderPaymentHistory(room) {
+  const payments = Object.entries(room.payments||{}).sort((a,b)=>(a[1].paidAt||0)-(b[1].paidAt||0));
+  const wrap = document.getElementById('pay-history');
+  if (!payments.length) {
+    wrap.innerHTML = `<div style="color:var(--fg3);font-size:.83rem;text-align:center;padding:12px">ยังไม่มีการจ่ายเงิน</div>`;
+    return;
+  }
+  wrap.innerHTML = payments.map(([pid, p]) => {
+    const dt = p.paidAt ? new Date(p.paidAt) : null;
+    const dtStr = dt ? `${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()+543} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}` : '';
+    return `<div class="payment-hist-item">
+      ${p.slipData ? `<img class="slip-thumb" src="${p.slipData}" onclick="showSlipPreview('${p.slipData}')" title="ดูสลิป" />` : '<div style="width:44px;height:44px;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">📄</div>'}
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:var(--free);font-size:.9rem">฿${(p.amount||0).toLocaleString()}</div>
+        ${p.note?`<div style="font-size:.78rem;color:var(--fg2)">${esc(p.note)}</div>`:''}
+        <div style="font-size:.73rem;color:var(--fg3)">${dtStr}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--busy);border-color:var(--busy-bd);font-size:.7rem" data-pid="${pid}" onclick="deletePayment(this.dataset.pid)">ลบ</button>
+    </div>`;
+  }).join('');
+}
+
+async function saveRoomPrice() {
+  const price = parseInt(document.getElementById('inp-room-price').value)||0;
+  if (!paymentRoomId) return;
+  const path = `trips/${currentId}/rooms/${paymentRoomId}/price`;
+  if (db) {
+    try { await db.ref(path).set(price); toast('บันทึกราคาแล้ว ✓'); }
+    catch(e) { toast('เกิดข้อผิดพลาด'); }
+  } else {
+    if (!localData[currentId].rooms[paymentRoomId]) return;
+    localData[currentId].rooms[paymentRoomId].price = price;
+    renderTrip(localData[currentId]);
+    toast('บันทึกราคาแล้ว ✓');
+  }
+}
+
+function onSlipFileChange(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('slip-file-name').textContent = file.name;
+  compressImage(file, 800, 0.72).then(dataUrl => {
+    slipDataUrl = dataUrl;
+    document.getElementById('slip-preview-img').src = dataUrl;
+    document.getElementById('slip-preview-wrap').classList.remove('hidden');
+  });
+}
+
+function compressImage(file, maxSide, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxSide || h > maxSide) {
+        if (w > h) { h = Math.round(h * maxSide / w); w = maxSide; }
+        else { w = Math.round(w * maxSide / h); h = maxSide; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = url;
+  });
+}
+
+async function savePayment() {
+  const amount = parseInt(document.getElementById('inp-pay-amount').value)||0;
+  if (!amount) { toast('ใส่จำนวนเงินก่อนนะ'); return; }
+  if (!paymentRoomId) return;
+  const note = document.getElementById('inp-pay-note').value.trim();
+  const payData = { amount, paidAt: Date.now() };
+  if (note) payData.note = note;
+  if (slipDataUrl) payData.slipData = slipDataUrl;
+  const payId = genId();
+  const path = `trips/${currentId}/rooms/${paymentRoomId}/payments/${payId}`;
+  document.getElementById('btn-save-payment').disabled = true;
+  if (db) {
+    try {
+      await db.ref(path).set(payData);
+      toast('บันทึกการจ่ายเงินแล้ว ✓');
+      closeModal('modal-payment');
+    } catch(e) { toast('เกิดข้อผิดพลาด: ' + e.message); }
+  } else {
+    if (!localData[currentId].rooms[paymentRoomId].payments) localData[currentId].rooms[paymentRoomId].payments = {};
+    localData[currentId].rooms[paymentRoomId].payments[payId] = payData;
+    renderTrip(localData[currentId]);
+    toast('บันทึกการจ่ายเงินแล้ว ✓');
+    closeModal('modal-payment');
+  }
+  document.getElementById('btn-save-payment').disabled = false;
+}
+
+async function deletePayment(payId) {
+  if (!confirm('ลบรายการจ่ายเงินนี้?')) return;
+  if (!paymentRoomId) return;
+  const path = `trips/${currentId}/rooms/${paymentRoomId}/payments/${payId}`;
+  if (db) {
+    try { await db.ref(path).remove(); toast('ลบแล้ว'); }
+    catch(e) { toast('เกิดข้อผิดพลาด'); }
+  } else {
+    delete localData[currentId].rooms[paymentRoomId].payments[payId];
+    renderTrip(localData[currentId]);
+    toast('ลบแล้ว');
+  }
+  closeModal('modal-payment');
+}
+
+function showSlipPreview(src) {
+  document.getElementById('slip-full-img').src = src;
+  document.getElementById('slip-full-preview').classList.remove('hidden');
 }
 
 // ── Boot ──
